@@ -335,6 +335,7 @@ donde \(C_t\in\R^{K_\delta\times K_\tau}\) contiene los coeficientes. Vectorizan
   \qquad
   c_t=\operatorname{vec}(C_t).
 \]
+Esta convención implica que \(F_t\) tiene deltas como filas y tenores como columnas; por tanto, \(\operatorname{vec}(F_t)\) apila primero todos los deltas del primer tenor, luego todos los deltas del segundo tenor, y así sucesivamente. En el código, esto corresponde a ordenar cada día como \texttt{arrange(t\_anos, delta)}. La convención alternativa \(\operatorname{vec}(F_t^\top)\), que apila todos los tenores de un delta antes de pasar al siguiente, también es válida si se cambia simultáneamente el diseño a \(X=\Phi_\delta\otimes\Phi_\tau\) y la métrica a \(G=G_\delta\otimes G_\tau\). Lo que no es válido es mezclar \(\operatorname{vec}(F_t^\top)\) con \(X=\Phi_\tau\otimes\Phi_\delta\), porque en ese caso cada observación se asigna a una fila de diseño que corresponde a otro nodo de la malla. Un diagnóstico A/B/C confirmó esta equivalencia: para USD/PEN, las dos convenciones consistentes entregan PC1=0.740525, PC1--PC2=0.980551 y PC1--PC3=0.993705, mientras que la convención mezclada reproduce PC1=0.922336, consistente con el resultado antiguo y atribuible a un desalineamiento de vectorización.
 
 En la implementación final:
 \[

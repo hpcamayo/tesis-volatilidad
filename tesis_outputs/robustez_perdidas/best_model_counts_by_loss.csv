@@ -1,0 +1,6 @@
+"Loss","Modelo","Count"
+"MAE_med","PM","24"
+"RMSE_med","PM","24"
+"WRMSE_long_med","PM","24"
+"WRMSE_short_med","PA","1"
+"WRMSE_short_med","PM","23"

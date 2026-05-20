@@ -10,8 +10,9 @@
 #   3. Estimacion de coeficientes por dia
 #   4. Metricas de ajuste y diagnosticos base
 #   5. FPCA global con correccion Gram-Cholesky (descriptiva)
-#   6. Estabilidad subespacial
-#   7. Eigensuperficies y visualizacion FPCA
+#   6. FPCA rolling descriptiva por ventanas 1m-6m
+#   7. Estabilidad subespacial
+#   8. Eigensuperficies y visualizacion FPCA
 #   7B. Utilidades rolling-FPCA, modelos y tuning
 #   8A. Tuning conjunto de TRAIN_SIZE y K0 (leakage-free)
 #   8B. Backtest rolling final (leakage-free)
@@ -40,6 +41,9 @@ RUN_ALL_OVERRIDE<-Sys.getenv("RUN_ALL_MONEDAS_OVERRIDE")
 if(nzchar(RUN_ALL_OVERRIDE)){
   RUN_ALL_MONEDAS<-tolower(RUN_ALL_OVERRIDE)%in%c("1","true","t","yes","y","si")
 }
+
+STOP_AFTER_ROLLING_FPCA<-tolower(Sys.getenv("STOP_AFTER_ROLLING_FPCA","false"))%in%
+  c("1","true","t","yes","y","si")
 
 MONEDA_OVERRIDE<-Sys.getenv("MONEDA_WORK_OVERRIDE")
 IS_CHILD_RUN<-nzchar(MONEDA_OVERRIDE)
@@ -76,7 +80,8 @@ if(RUN_ALL_MONEDAS&&!IS_CHILD_RUN){
       args=shQuote(script_path),
       env=c(
         paste0("MONEDA_WORK_OVERRIDE=",m),
-        "RUN_ALL_MONEDAS_OVERRIDE=FALSE"
+        "RUN_ALL_MONEDAS_OVERRIDE=FALSE",
+        paste0("STOP_AFTER_ROLLING_FPCA=",Sys.getenv("STOP_AFTER_ROLLING_FPCA","false"))
       )
     )
   })
@@ -120,6 +125,16 @@ RUN_WINDOW_TUNING<-TRUE
 W_GRID<-c(44,66,88,110,132,154,176,198)
 # Para una corrida mas rapida, reemplazar por:
 # W_GRID<-c(60,80,100,120,160)
+
+ROLLING_FPCA_WINDOWS<-c(22,44,66,88,110,132)
+ROLLING_FPCA_WINDOW_LABELS<-c(
+  "22"="1m",
+  "44"="2m",
+  "66"="3m",
+  "88"="4m",
+  "110"="5m",
+  "132"="6m"
+)
 
 K_GAUSS<-function(u) exp(-0.5*u^2)
 
@@ -357,7 +372,263 @@ cat("\nTabla FVE por par:\n")
 print(tabla_fve)
 
 # -----------------------------------------------------------------------------
-# 6. ESTABILIDAD SUBESPACIAL
+# 6. FPCA ROLLING DESCRIPTIVA POR VENTANAS 1M-6M
+# -----------------------------------------------------------------------------
+# Uso: diagnostico estructural. Los modelos dinamicos siguen usando sus puntajes
+# definidos en las secciones de backtest; este bloque explora como cambia la
+# geometria FPCA a traves del tiempo.
+
+projector_dist_rolling<-function(A,B){
+  PA<-A%*%t(A)
+  PB<-B%*%t(B)
+  sqrt(sum((PA-PB)^2))
+}
+
+rolling_safe_median<-function(x){
+  x<-x[is.finite(x)]
+  if(length(x)==0) return(NA_real_)
+  median(x)
+}
+
+rolling_safe_quantile<-function(x,p){
+  x<-x[is.finite(x)]
+  if(length(x)==0) return(NA_real_)
+  as.numeric(quantile(x,p,na.rm=TRUE))
+}
+
+rolling_safe_max<-function(x){
+  x<-x[is.finite(x)]
+  if(length(x)==0) return(NA_real_)
+  max(x)
+}
+
+take_num<-function(x,i){
+  if(length(x)<i) return(NA_real_)
+  as.numeric(x[i])
+}
+
+take_threshold<-function(cv,umbral){
+  k<-which(cv>=umbral)[1]
+  if(length(k)==0||is.na(k)) return(NA_integer_)
+  as.integer(k)
+}
+
+idx_roll_complete<-which(complete.cases(coef_mat))
+coef_roll<-coef_mat[idx_roll_complete,,drop=FALSE]
+fechas_roll<-fechas[idx_roll_complete]
+n_roll<-nrow(coef_roll)
+
+rolling_fpca_one_window<-function(W){
+  etiqueta<-unname(ROLLING_FPCA_WINDOW_LABELS[as.character(W)])
+  if(is.na(etiqueta)) etiqueta<-paste0(W,"d")
+
+  if(n_roll<W){
+    return(tibble())
+  }
+
+  out<-vector("list",n_roll-W+1)
+  A_prev<-NULL
+
+  for(pos in W:n_roll){
+    start<-pos-W+1
+    idx<-start:pos
+    cm_w<-coef_roll[idx,,drop=FALSE]
+    mu_w<-colMeans(cm_w)
+    cc_w<-sweep(cm_w,2,mu_w,"-")
+    U_w<-cc_w%*%t(S)
+    fp_w<-prcomp(U_w,center=FALSE,scale.=FALSE)
+
+    ev<-fp_w$sdev^2
+    ev_sum<-sum(ev)
+    if(!is.finite(ev_sum)||ev_sum<=0){
+      ve<-rep(NA_real_,length(ev))
+      cv<-ve
+    }else{
+      ve<-ev/ev_sum
+      cv<-cumsum(ve)
+    }
+
+    ncomp<-min(3,ncol(fp_w$rotation),ncol(fpca$rotation))
+    A_w<-fp_w$rotation[,1:ncomp,drop=FALSE]
+    A_global<-fpca$rotation[,1:ncomp,drop=FALSE]
+    dist_global<-projector_dist_rolling(A_w,A_global)
+    dist_prev<-if(is.null(A_prev)) NA_real_ else projector_dist_rolling(A_w,A_prev)
+    A_prev<-A_w
+
+    out[[pos-W+1]]<-data.frame(
+      moneda=toupper(MONEDA_WORK),
+      window_dias=W,
+      window_label=etiqueta,
+      t_start=start,
+      t_end=pos,
+      fecha_start=fechas_roll[start],
+      fecha_end=fechas_roll[pos],
+      PC1=take_num(ve,1),
+      PC2=take_num(ve,2),
+      PC3=take_num(ve,3),
+      PC1_PC2=take_num(cv,2),
+      PC1_PC3=take_num(cv,3),
+      K95=take_threshold(cv,0.95),
+      K99=take_threshold(cv,0.99),
+      dist_global3=dist_global,
+      dist_prev3=dist_prev
+    )
+  }
+
+  bind_rows(out)
+}
+
+rolling_fpca_diag<-map_dfr(ROLLING_FPCA_WINDOWS,rolling_fpca_one_window)%>%
+  mutate(
+    window_label=factor(
+      window_label,
+      levels=unname(ROLLING_FPCA_WINDOW_LABELS[
+        as.character(ROLLING_FPCA_WINDOWS)
+      ])
+    )
+  )
+
+rolling_fpca_summary<-rolling_fpca_diag%>%
+  group_by(window_dias,window_label)%>%
+  summarise(
+    n_windows=n(),
+    fecha_min=min(fecha_end),
+    fecha_max=max(fecha_end),
+    PC1_mediana=round(rolling_safe_median(PC1),4),
+    PC1_p05=round(rolling_safe_quantile(PC1,0.05),4),
+    PC1_p95=round(rolling_safe_quantile(PC1,0.95),4),
+    PC2_mediana=round(rolling_safe_median(PC2),4),
+    PC2_p05=round(rolling_safe_quantile(PC2,0.05),4),
+    PC2_p95=round(rolling_safe_quantile(PC2,0.95),4),
+    PC1_PC2_mediana=round(rolling_safe_median(PC1_PC2),4),
+    K95_mediana=rolling_safe_median(K95),
+    K95_max=rolling_safe_max(K95),
+    K99_mediana=rolling_safe_median(K99),
+    K99_max=rolling_safe_max(K99),
+    prop_PC1_ge_95=round(mean(PC1>=0.95,na.rm=TRUE),3),
+    prop_PC1_PC2_ge_95=round(mean(PC1_PC2>=0.95,na.rm=TRUE),3),
+    dist_global3_mediana=round(rolling_safe_median(dist_global3),4),
+    dist_global3_p95=round(rolling_safe_quantile(dist_global3,0.95),4),
+    dist_global3_max=round(rolling_safe_max(dist_global3),4),
+    dist_prev3_mediana=round(rolling_safe_median(dist_prev3),4),
+    dist_prev3_p95=round(rolling_safe_quantile(dist_prev3,0.95),4),
+    .groups="drop"
+  )
+
+cat("\nFPCA rolling descriptiva (ventanas 1m-6m):\n")
+print(rolling_fpca_summary)
+
+df_rolling_pc<-rolling_fpca_diag%>%
+  dplyr::select(fecha_end,window_label,PC1,PC2,PC1_PC2)%>%
+  pivot_longer(cols=c(PC1,PC2,PC1_PC2),
+               names_to="metrica",values_to="valor")%>%
+  mutate(
+    metrica=recode(metrica,
+                   PC1="PC1",
+                   PC2="PC2",
+                   PC1_PC2="PC1+PC2")
+  )
+
+p_rolling_fpca_pc<-ggplot(df_rolling_pc,
+                          aes(x=fecha_end,y=valor,color=metrica))+
+  geom_line(linewidth=0.55,alpha=0.9)+
+  facet_wrap(~window_label,ncol=2)+
+  scale_y_continuous(labels=scales::percent_format(accuracy=1),
+                     limits=c(0,1))+
+  labs(title=paste0("FPCA rolling: varianza explicada - ",
+                    toupper(MONEDA_WORK)),
+       subtitle="Ventanas moviles aproximadas de 1 a 6 meses",
+       x="Fin de ventana",y="Proporcion de varianza",color=NULL)+
+  theme_minimal(base_size=12)+
+  theme(legend.position="bottom")
+
+df_rolling_k<-rolling_fpca_diag%>%
+  dplyr::select(fecha_end,window_label,K95,K99)%>%
+  pivot_longer(cols=c(K95,K99),names_to="criterio",values_to="K")
+
+p_rolling_fpca_k<-ggplot(df_rolling_k,
+                         aes(x=fecha_end,y=K,color=criterio))+
+  geom_step(linewidth=0.55,alpha=0.9)+
+  facet_wrap(~window_label,ncol=2)+
+  scale_y_continuous(breaks=seq(0,K_TOTAL,by=2))+
+  labs(title=paste0("FPCA rolling: componentes para FVE - ",
+                    toupper(MONEDA_WORK)),
+       subtitle="K95 y K99 por ventana movil",
+       x="Fin de ventana",y="Numero de componentes",color=NULL)+
+  theme_minimal(base_size=12)+
+  theme(legend.position="bottom")
+
+df_rolling_dist<-rolling_fpca_diag%>%
+  dplyr::select(fecha_end,window_label,dist_global3,dist_prev3)%>%
+  pivot_longer(cols=c(dist_global3,dist_prev3),
+               names_to="distancia",values_to="valor")%>%
+  mutate(
+    distancia=recode(distancia,
+                     dist_global3="vs FPCA global",
+                     dist_prev3="vs ventana previa")
+  )
+
+p_rolling_fpca_dist<-ggplot(df_rolling_dist,
+                            aes(x=fecha_end,y=valor,color=distancia))+
+  geom_line(linewidth=0.55,alpha=0.9,na.rm=TRUE)+
+  facet_wrap(~window_label,ncol=2)+
+  labs(title=paste0("FPCA rolling: distancia subespacial PC1-PC3 - ",
+                    toupper(MONEDA_WORK)),
+       subtitle="Norma de Frobenius entre proyectores; 0 indica subespacios identicos",
+       x="Fin de ventana",y="Distancia",color=NULL)+
+  theme_minimal(base_size=12)+
+  theme(legend.position="bottom")
+
+if(STOP_AFTER_ROLLING_FPCA){
+  write_csv(tabla_fechas,file.path(SALIDA_DIR,"tabla_fechas.csv"))
+  write_csv(tabla_fve,file.path(SALIDA_DIR,"tabla_fve.csv"))
+  write_csv(rolling_fpca_diag,file.path(SALIDA_DIR,"tabla_fpca_rolling.csv"))
+  write_csv(rolling_fpca_summary,file.path(SALIDA_DIR,"tabla_fpca_rolling_resumen.csv"))
+
+  ggsave(file.path(SALIDA_DIR,"fig_rolling_fpca_varianza.pdf"),
+         p_rolling_fpca_pc,width=10,height=8)
+  ggsave(file.path(SALIDA_DIR,"fig_rolling_fpca_k95_k99.pdf"),
+         p_rolling_fpca_k,width=10,height=8)
+  ggsave(file.path(SALIDA_DIR,"fig_rolling_fpca_distancias.pdf"),
+         p_rolling_fpca_dist,width=10,height=8)
+
+  saveRDS(list(
+    parametros=list(
+      RUTA_DATOS=RUTA_DATOS,
+      MONEDA_WORK=MONEDA_WORK,
+      K_DELTA=K_DELTA,
+      K_TENOR=K_TENOR,
+      GRADO_SPLINE=GRADO_SPLINE,
+      DELTA_VALS=DELTA_VALS,
+      TENOR_VALS=TENOR_VALS,
+      ROLLING_FPCA_WINDOWS=ROLLING_FPCA_WINDOWS,
+      STOP_AFTER_ROLLING_FPCA=STOP_AFTER_ROLLING_FPCA
+    ),
+    tabla_fechas=tabla_fechas,
+    coef_mat=coef_mat,
+    fechas=fechas,
+    X=X,
+    fpca=fpca,
+    var_exp=var_exp,
+    fve_cum=fve_cum,
+    G=G,
+    S=S,
+    Sinv=Sinv,
+    coef_mean=coef_mean,
+    tabla_fve=tabla_fve,
+    rolling_fpca_diag=rolling_fpca_diag,
+    rolling_fpca_summary=rolling_fpca_summary
+  ),file=file.path(SALIDA_DIR,"tesis_resultados_rolling_fpca.rds"))
+
+  cat("\n=== COMPLETADO HASTA FPCA ROLLING ===\n")
+  cat("Carpeta de salida:\n")
+  cat(SALIDA_DIR,"\n")
+  cat("No se ejecutaron modelos dinamicos ni backtests.\n")
+  quit(save="no",status=0)
+}
+
+# -----------------------------------------------------------------------------
+# 7. ESTABILIDAD SUBESPACIAL
 # -----------------------------------------------------------------------------
 
 W_sub<-50
@@ -434,6 +705,39 @@ rmse_calc<-function(yhat,yobs){
   m<-is.finite(yhat)&is.finite(yobs)
   if(sum(m)==0) return(NA_real_)
   sqrt(mean((yhat[m]-yobs[m])^2))
+}
+
+mae_calc<-function(yhat,yobs){
+  m<-is.finite(yhat)&is.finite(yobs)
+  if(sum(m)==0) return(NA_real_)
+  mean(abs(yhat[m]-yobs[m]))
+}
+
+wrmse_calc<-function(yhat,yobs,w){
+  m<-is.finite(yhat)&is.finite(yobs)&is.finite(w)
+  if(sum(m)==0) return(NA_real_)
+  sqrt(sum(w[m]*(yhat[m]-yobs[m])^2)/sum(w[m]))
+}
+
+loss_grid<-expand.grid(
+  tenor=TENOR_VALS,
+  delta=DELTA_VALS
+)%>%
+  arrange(tenor,delta)
+
+w_equal<-rep(1,nrow(loss_grid))
+w_short<-1/sqrt(loss_grid$tenor)
+w_short<-w_short/mean(w_short)
+w_long<-sqrt(loss_grid$tenor)
+w_long<-w_long/mean(w_long)
+
+loss_metrics<-function(yhat,yobs){
+  data.frame(
+    RMSE=rmse_calc(yhat,yobs),
+    MAE=mae_calc(yhat,yobs),
+    WRMSE_short=wrmse_calc(yhat,yobs,w_short),
+    WRMSE_long=wrmse_calc(yhat,yobs,w_long)
+  )
 }
 
 safe_median<-function(x){
@@ -727,6 +1031,23 @@ calc_sens_k0<-function(W){
 
 run_backtest<-function(W,K0_LOC,n_oos_loc,guardar_fechas=TRUE,log_rspec=TRUE){
   res_loc<-list()
+  loss_rows<-list()
+  loss_id<-0
+
+  add_loss<-function(hor,fecha_target,modelo,yhat,yobs,K0){
+    loss_id<<-loss_id+1
+    loss_rows[[loss_id]]<<-cbind(
+      data.frame(
+        Par=toupper(MONEDA_WORK),
+        h=hor,
+        fecha=fecha_target,
+        Modelo=modelo,
+        TRAIN_SIZE=W,
+        K0=K0
+      ),
+      loss_metrics(yhat,yobs)
+    )
+  }
 
   for(hor in HORIZONTES){
     res_loc[[as.character(hor)]]<-list(
@@ -762,9 +1083,11 @@ run_backtest<-function(W,K0_LOC,n_oos_loc,guardar_fechas=TRUE,log_rspec=TRUE){
 
       y_pm_raw<-as.numeric(get_obs(t_end))
       res_loc[[hs]]$PM<-c(res_loc[[hs]]$PM,rmse_calc(y_pm_raw,yobs))
+      add_loss(hor,fechas[t_tgt],"PM",y_pm_raw,yobs,K0)
 
       y_pa<-scores_to_surf_local(z_last,obj_fpca$mu,obj_fpca$A)
       res_loc[[hs]]$PA<-c(res_loc[[hs]]$PA,rmse_calc(y_pa,yobs))
+      add_loss(hor,fechas[t_tgt],"PA",y_pa,yobs,K0)
 
 
       tryCatch({
@@ -772,6 +1095,7 @@ run_backtest<-function(W,K0_LOC,n_oos_loc,guardar_fechas=TRUE,log_rspec=TRUE){
         zv<-as.numeric(pred_var1(fv,z_last,hor))
         yhat<-scores_to_surf_local(zv,obj_fpca$mu,obj_fpca$A)
         res_loc[[hs]]$VAR1<-c(res_loc[[hs]]$VAR1,rmse_calc(yhat,yobs))
+        add_loss(hor,fechas[t_tgt],"VAR1",yhat,yobs,K0)
       },error=function(e){
         err_count["VAR1"]<<-err_count["VAR1"]+1
         if(length(err_msg$VAR1)<5) err_msg$VAR1<<-c(err_msg$VAR1,conditionMessage(e))
@@ -783,6 +1107,7 @@ run_backtest<-function(W,K0_LOC,n_oos_loc,guardar_fechas=TRUE,log_rspec=TRUE){
         zi<-as.numeric(pred_arh_inc(fi,z_last,hor))
         yhat<-scores_to_surf_local(zi,obj_fpca$mu,obj_fpca$A)
         res_loc[[hs]]$ARHinc<-c(res_loc[[hs]]$ARHinc,rmse_calc(yhat,yobs))
+        add_loss(hor,fechas[t_tgt],"ARHinc",yhat,yobs,K0)
       },error=function(e){
         err_count["ARHinc"]<<-err_count["ARHinc"]+1
         if(length(err_msg$ARHinc)<5) err_msg$ARHinc<<-c(err_msg$ARHinc,conditionMessage(e))
@@ -795,6 +1120,7 @@ run_backtest<-function(W,K0_LOC,n_oos_loc,guardar_fechas=TRUE,log_rspec=TRUE){
         zk<-as.numeric(pred_kernel_arh(fk,Z_tr,nrow(Z_tr),hor))
         yhat<-scores_to_surf_local(zk,obj_fpca$mu,obj_fpca$A)
         res_loc[[hs]]$KernelARH<-c(res_loc[[hs]]$KernelARH,rmse_calc(yhat,yobs))
+        add_loss(hor,fechas[t_tgt],"KernelARH",yhat,yobs,K0)
 
         if(log_rspec){
           r_spec_loc<-rbind(
@@ -816,6 +1142,7 @@ run_backtest<-function(W,K0_LOC,n_oos_loc,guardar_fechas=TRUE,log_rspec=TRUE){
 
   list(
     res_oos=res_loc,
+    tabla_losses=bind_rows(loss_rows),
     r_spec_log=r_spec_loc,
     err_count=err_count,
     err_msg=err_msg
@@ -1167,6 +1494,7 @@ obj_final<-run_backtest(
 )
 
 res_oos<-obj_final$res_oos
+tabla_losses<-obj_final$tabla_losses
 r_spec_log<-obj_final$r_spec_log
 err_count<-obj_final$err_count
 err_msg<-obj_final$err_msg
@@ -1174,6 +1502,45 @@ err_msg<-obj_final$err_msg
 cat("\n=== ERRORES CAPTURADOS EN BACKTEST FINAL ===\n")
 print(err_count)
 print(err_msg)
+
+tabla_robust_loss<-tabla_losses%>%
+  group_by(Par,h,Modelo,TRAIN_SIZE,K0)%>%
+  summarise(
+    N=sum(is.finite(RMSE)),
+    RMSE_med=round(safe_median(RMSE),4),
+    MAE_med=round(safe_median(MAE),4),
+    WRMSE_short_med=round(safe_median(WRMSE_short),4),
+    WRMSE_long_med=round(safe_median(WRMSE_long),4),
+    .groups="drop"
+  )
+
+tabla_best_by_loss<-tabla_robust_loss%>%
+  pivot_longer(
+    cols=c(RMSE_med,MAE_med,WRMSE_short_med,WRMSE_long_med),
+    names_to="Loss",
+    values_to="Valor"
+  )%>%
+  group_by(Par,h,Loss)%>%
+  slice_min(Valor,n=1,with_ties=FALSE)%>%
+  ungroup()
+
+tabla_pm_dominance_loss<-tabla_best_by_loss%>%
+  group_by(Loss)%>%
+  summarise(
+    casos=n(),
+    casos_PM=sum(Modelo=="PM",na.rm=TRUE),
+    prop_PM=round(casos_PM/casos,3),
+    .groups="drop"
+  )
+
+cat("\n=== ROBUSTEZ POR FUNCION DE PERDIDA ===\n")
+print(tabla_robust_loss)
+
+cat("\n=== MEJOR MODELO POR FUNCION DE PERDIDA ===\n")
+print(tabla_best_by_loss)
+
+cat("\n=== DOMINANCIA PM POR FUNCION DE PERDIDA ===\n")
+print(tabla_pm_dominance_loss)
 
 
 # -----------------------------------------------------------------------------
@@ -1696,6 +2063,7 @@ saveRDS(list(
     K0_GRID=K0_GRID,
     K0_POR_HORIZONTE=K0_POR_HORIZONTE,
     W_GRID=W_GRID,
+    ROLLING_FPCA_WINDOWS=ROLLING_FPCA_WINDOWS,
     RUN_WINDOW_TUNING=RUN_WINDOW_TUNING
   ),
   tabla_fechas=tabla_fechas,
@@ -1713,6 +2081,8 @@ saveRDS(list(
   Sinv=Sinv,
   coef_mean=coef_mean,
   tabla_fve=tabla_fve,
+  rolling_fpca_diag=rolling_fpca_diag,
+  rolling_fpca_summary=rolling_fpca_summary,
   dist_subspace=dist_sub,
   rmse_vec_base=rmse_vec_base,
   rmse_base_mediana=median(rmse_vec_base,na.rm=TRUE),
@@ -1722,6 +2092,10 @@ saveRDS(list(
   tabla_ventanas_total=tabla_ventanas_total,
   tuning_list=tuning_list,
   res_oos=res_oos,
+  tabla_losses=tabla_losses,
+  tabla_robust_loss=tabla_robust_loss,
+  tabla_best_by_loss=tabla_best_by_loss,
+  tabla_pm_dominance_loss=tabla_pm_dominance_loss,
   r_spec_log=r_spec_log,
   err_count=err_count,
   err_msg=err_msg,
@@ -1759,6 +2133,15 @@ ggsave(file.path(SALIDA_DIR,"fig_oos_boxplot.pdf"),
 ggsave(file.path(SALIDA_DIR,"fig_estabilidad_subespacio.pdf"),
        p_subspace,width=9,height=5)
 
+ggsave(file.path(SALIDA_DIR,"fig_rolling_fpca_varianza.pdf"),
+       p_rolling_fpca_pc,width=10,height=8)
+
+ggsave(file.path(SALIDA_DIR,"fig_rolling_fpca_k95_k99.pdf"),
+       p_rolling_fpca_k,width=10,height=8)
+
+ggsave(file.path(SALIDA_DIR,"fig_rolling_fpca_distancias.pdf"),
+       p_rolling_fpca_dist,width=10,height=8)
+
 ggsave(file.path(SALIDA_DIR,"fig_gap_pm_bloques.pdf"),
        p_gap_bloques,width=9,height=5)
 
@@ -1773,6 +2156,12 @@ for(k in 1:3){
 
 write_csv(tabla_fechas,file.path(SALIDA_DIR,"tabla_fechas.csv"))
 write_csv(tabla_fve,file.path(SALIDA_DIR,"tabla_fve.csv"))
+write_csv(rolling_fpca_diag,file.path(SALIDA_DIR,"tabla_fpca_rolling.csv"))
+write_csv(rolling_fpca_summary,file.path(SALIDA_DIR,"tabla_fpca_rolling_resumen.csv"))
+write_csv(tabla_losses,file.path(SALIDA_DIR,"tabla_losses_long.csv"))
+write_csv(tabla_robust_loss,file.path(SALIDA_DIR,"tabla_robust_loss.csv"))
+write_csv(tabla_best_by_loss,file.path(SALIDA_DIR,"tabla_best_by_loss.csv"))
+write_csv(tabla_pm_dominance_loss,file.path(SALIDA_DIR,"tabla_pm_dominance_loss.csv"))
 write_csv(tabla_rmse,file.path(SALIDA_DIR,"tabla_rmse.csv"))
 write_csv(tabla_ta,file.path(SALIDA_DIR,"tabla_tasa_aciertos.csv"))
 write_csv(var1_diag_resumen,file.path(SALIDA_DIR,"tabla_var1_diag.csv"))
@@ -1794,6 +2183,7 @@ cat(SALIDA_DIR,"\n")
 cat("Archivos generados: tesis_resultados.rds + PDFs de figuras + CSVs de tablas\n")
 cat("Resumen final:\n")
 cat("  - FPCA global usada solo para diagnostico descriptivo\n")
+cat("  - FPCA rolling descriptiva agregada para ventanas aproximadas de 1m a 6m\n")
 cat("  - Backtest final ejecutado con FPCA rolling-local sin leakage\n")
 cat("  - K0 seleccionado por horizonte via sensibilidad rolling-local\n")
 cat("  - TRAIN_SIZE seleccionado via tuning conjunto de ventana y K0\n")

@@ -20,6 +20,24 @@ La corrida final cubre 8 pares de divisas, 299 superficies completas por par y 3
 
 El resultado predictivo es claro: bajo RMSE mediano sobre la malla observada, la persistencia cruda (`PM`) domina en los 24 casos par-horizonte. Los modelos `PA`, `VAR1`, `ARHinc` y `KernelARH` no superan a `PM` en mediana. Las pruebas Diebold-Mariano identifican inferioridad estadisticamente significativa de las alternativas frente a `PM` en 86 de 96 comparaciones; en las 10 restantes no hay evidencia de mejora, y `PM` sigue teniendo menor RMSE mediano.
 
+## Diagnostico de convencion de vectorizacion
+
+Se corrio `diagnose_vectorization_convention.R` para verificar la convencion tensorial. El resultado confirma que la convencion actual es correcta:
+
+- A: `y = arrange(t_anos, delta)`, `X = Phi_t %x% Phi_d`, `G = G_t %x% G_d`.
+- B: `y = arrange(delta, t_anos)`, `X = Phi_d %x% Phi_t`, `G = G_d %x% G_t`.
+- C: `y = arrange(delta, t_anos)`, pero `X = Phi_t %x% Phi_d`, `G = G_t %x% G_d`.
+
+Los casos A y B son equivalentes: para los 8 pares, las diferencias A vs B en RMSE mediano, PC1, PC1-PC2 y PC1-PC3 son exactamente 0 tras redondear a 6 decimales, y `K95`/`K99` coinciden. El caso C es la convencion vieja/inconsistente y reproduce el resultado antiguo de USD/PEN.
+
+| Caso USD/PEN | RMSE mediana | PC1 | PC1-PC2 | PC1-PC3 | K95 | K99 |
+|---|---:|---:|---:|---:|---:|---:|
+| A actual consistente td | 0.916379 | 0.740525 | 0.980551 | 0.993705 | 2 | 3 |
+| B alternativa consistente dt | 0.916379 | 0.740525 | 0.980551 | 0.993705 | 2 | 3 |
+| C vieja inconsistente dt con Xtd | 0.780733 | 0.922336 | 0.994059 | 0.998040 | 2 | 2 |
+
+Conclusion: se debe usar la convencion actual A en el pipeline, o la alternativa B solo si se cambia simultaneamente `X` y `G`. No se debe usar `arrange(delta,t_anos)` con `X = Phi_t %x% Phi_d`.
+
 ## Estado de corrida
 
 | Par | Estado |
@@ -166,4 +184,3 @@ Interpretacion:
 - H2 queda rechazada: los modelos dinamicos sobre puntajes FPCA no superan a la persistencia cruda bajo RMSE mediano.
 - H3 queda apoyada: `PM` es un benchmark fuerte para horizontes cortos y medianos en superficies de volatilidad altamente persistentes.
 - La tesis debe formularse como un resultado descriptivo fuerte y un resultado predictivo negativo informativo, no como una tesis de mejora predictiva.
-

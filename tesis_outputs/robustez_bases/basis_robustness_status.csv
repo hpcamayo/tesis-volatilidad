@@ -1,0 +1,9 @@
+Par,basis_id,K_DELTA,K_TENOR,status
+USDPEN,base_4x8,4,8,OK
+USDCOP,base_4x8,4,8,OK
+USDCLP,base_4x8,4,8,OK
+USDBRL,base_4x8,4,8,OK
+USDARS,base_4x8,4,8,OK
+USDMXN,base_4x8,4,8,OK
+EURUSD,base_4x8,4,8,OK
+USDZAR,base_4x8,4,8,OK
