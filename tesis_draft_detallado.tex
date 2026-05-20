@@ -1,0 +1,947 @@
+\documentclass[a4paper,11pt]{article}
+
+\usepackage[top=3cm,bottom=2.54cm,left=3cm,right=2.54cm]{geometry}
+\setlength{\parskip}{2.5mm}
+\usepackage[utf8]{inputenc}
+\usepackage[provide=*,spanish]{babel}
+\usepackage{amsfonts,amsmath,amssymb}
+\usepackage{url}
+\usepackage{enumerate}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage[
+    colorlinks=true,
+    linkcolor=black,
+    citecolor=blue,
+    urlcolor=blue
+]{hyperref}
+
+\renewcommand{\baselinestretch}{1.25}
+
+\newcommand{\SVI}{superficie de volatilidad implícita}
+\newcommand{\SVIs}{superficies de volatilidad implícita}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\norm}[1]{\left\lVert #1 \right\rVert}
+\newcommand{\inner}[2]{\left\langle #1,#2 \right\rangle}
+\newcommand{\maybeinclude}[2][]{%
+  \IfFileExists{#2}{\includegraphics[#1]{#2}}{\fbox{\parbox{0.85\linewidth}{Figura no disponible: \texttt{#2}}}}%
+}
+
+\title{\textbf{Representación funcional y evaluación predictiva de superficies de volatilidad implícita en mercados de divisas}\\
+\large Un enfoque basado en B-splines tensoriales, FPCA y backtesting fuera de muestra}
+\author{Autor: Henri Paul Camayo Guillermo, \texttt{henri.camayo@pucp.pe}\\
+Asesora: Dra. Felícita Doris Miranda Huaynalaya}
+\date{20 de mayo de 2026}
+
+\begin{document}
+
+\begin{titlepage}
+  \centering
+  \vspace*{\fill}
+  {\Large\bfseries
+    Representación funcional y evaluación predictiva de superficies de volatilidad implícita\\
+    en mercados de divisas\par}
+  \vspace{0.75cm}
+  {\large Un enfoque basado en B-splines tensoriales, FPCA y backtesting fuera de muestra\par}
+  \vspace{1.5cm}
+  \normalsize
+  \textbf{Autor:} Henri Paul Camayo Guillermo, \texttt{henri.camayo@pucp.pe}\\
+  \textbf{Asesora:} Dra. Felícita Doris Miranda Huaynalaya\\
+  \vspace{1.5cm}
+  20 de mayo de 2026
+  \vspace*{\fill}
+\end{titlepage}
+
+\begin{abstract}
+Esta tesis estudia la representación funcional y la evaluación predictiva de \SVIs{} en mercados de divisas, con énfasis en pares latinoamericanos. El enfoque convierte cada superficie diaria, observada en una malla regular de delta y tenor, en una función bidimensional aproximada mediante una base B-spline tensorial. Sobre esta representación se aplica una corrección métrica mediante la matriz de Gram y una descomposición en componentes principales funcionales (FPCA), de modo que la reducción de dimensión se realiza en la geometría natural \(L^2(\Delta\times T)\) y no en la geometría euclidiana arbitraria de los coeficientes de base.
+
+La contribución empírica consiste en separar dos preguntas que suelen confundirse. La primera es descriptiva: si la FPCA representa, comprime e interpreta de manera parsimoniosa las \SVIs{}. La segunda es predictiva: si los modelos dinámicos construidos sobre puntajes FPCA superan a un benchmark de persistencia cruda en pronóstico fuera de muestra. La distinción es central porque una superficie puede tener estructura de baja dimensión y, aun así, la dinámica estimada sobre esa estructura puede no reducir el error de pronóstico sobre la malla observada.
+
+Con datos diarios de Bloomberg para ocho pares de divisas entre el 4 de febrero de 2025 y el 27 de marzo de 2026, se verifican 299 superficies completas por par, cada una con 65 nodos. Los resultados descriptivos muestran una estructura de baja dimensión: en todos los pares, una o dos componentes explican al menos 95\% de la variación funcional, y dos o tres componentes explican al menos 99\%. En cambio, el ejercicio predictivo entrega un resultado negativo pero informativo: bajo RMSE sobre la malla observada, la persistencia cruda (PM) obtiene la menor mediana de error en los ocho pares y en los tres horizontes evaluados (\(h=1,5,10\)). Los modelos PA, VAR(1), ARH en incrementos y KernelARH no logran superar este benchmark. La evidencia apoya la utilidad descriptiva de la representación funcional y rechaza la hipótesis de superioridad predictiva de los modelos dinámicos FPCA en este diseño.
+\end{abstract}
+
+\noindent\textbf{Palabras clave:} volatilidad implícita, superficies funcionales, FPCA, B-splines tensoriales, mercados cambiarios, backtesting, persistencia.
+
+\newpage
+\tableofcontents
+\newpage
+
+\section{Introducción}
+
+En los mercados de derivados financieros, la \SVI{} resume el nivel de volatilidad que el mercado incorpora para opciones con diferentes grados de moneyness y vencimientos. En divisas, esta superficie es central para la valorización de opciones, la gestión de riesgo de mesas de derivados, la cobertura de exposiciones y el análisis de episodios de tensión cambiaria. A diferencia de una serie univariada de volatilidad, una \SVI{} describe simultáneamente la estructura transversal por delta y la estructura temporal por tenor, de modo que cada observación diaria es un objeto bidimensional.
+
+Los mercados latinoamericanos añaden dificultades específicas. La liquidez suele ser menor que en divisas del G10, la profundidad de cotización varía por vencimiento y el comportamiento de la superficie puede reflejar episodios de intervención, estrés local o cambios en expectativas macrofinancieras. Los modelos paramétricos clásicos, como Heston \cite{Heston1993} o SABR \cite{Hagan2002}, proporcionan estructuras interpretables y compatibles con la práctica financiera, pero pueden ser rígidos cuando se busca capturar patrones empíricos de superficies observadas en mallas completas. En este contexto, el análisis de datos funcionales (FDA) ofrece una alternativa natural: tratar cada superficie como una función y estudiar su variación mediante bases, operadores y componentes principales funcionales \cite{RamsaySilverman2006}.
+
+La literatura muestra que las superficies de volatilidad suelen estar gobernadas por pocos factores latentes. Cont y Da Fonseca \cite{ContDaFonseca2002} y Fengler et al. \cite{Fengler2003} documentan estructuras comunes en volatilidades implícitas. Jaimungal y Ng \cite{JaimungalNg2007}, Kearney et al. \cite{Kearney2018}, Shang y Kearney \cite{ShangKearney2022}, Weaver et al. \cite{Weaver2020} y Tan et al. \cite{Tan2024} desarrollan enfoques funcionales o semifuncionales para pronosticar superficies o factores de volatilidad. Estas contribuciones motivan la pregunta central de esta tesis: en una muestra reciente y densa de superficies cambiarias, ¿la estructura funcional de baja dimensión se traduce en ganancias predictivas frente a una referencia simple de persistencia?
+
+La respuesta empírica requiere distinguir dos planos. El primero es descriptivo: una representación funcional puede comprimir, suavizar e interpretar las superficies de manera eficaz. El segundo es predictivo: un modelo dinámico sobre los puntajes FPCA debe mejorar el error fuera de muestra sobre una métrica concreta. Esta distinción es crucial. Un conjunto pequeño de componentes puede explicar casi toda la varianza histórica sin necesariamente reducir el RMSE de pronóstico frente a una regla que copia la última superficie observada. La persistencia cruda no incurre en error de suavizado, no estima parámetros dinámicos y, en horizontes cortos, se beneficia de la fuerte persistencia de las superficies de volatilidad.
+
+Esta tesis propone y evalúa un flujo de trabajo funcional completo. Primero, cada superficie diaria se aproxima mediante una base B-spline tensorial sobre delta y tenor. Segundo, se corrige la métrica de los coeficientes mediante la matriz de Gram y su factorización de Cholesky, de modo que la FPCA se realice en la geometría \(L^2\) correspondiente. Tercero, se comparan modelos de pronóstico fuera de muestra sobre puntajes FPCA contra dos persistencias: persistencia cruda en la malla observada (PM) y persistencia de la superficie ajustada (PA). La evaluación se realiza mediante ventanas móviles, selección libre de filtración temporal de \(TRAIN\_SIZE\) y \(K_0\), RMSE sobre la malla observada, tasas de acierto frente a PM y pruebas de Diebold-Mariano \cite{DieboldMariano1995}.
+
+El resultado principal es doble. En la dimensión descriptiva, la FPCA confirma que las \SVIs{} de los ocho pares analizados poseen una estructura fuertemente de baja dimensión: una o dos componentes bastan para alcanzar 95\% de varianza explicada, y dos o tres para alcanzar 99\%. En la dimensión predictiva, la persistencia cruda domina bajo RMSE mediano en todos los pares y horizontes de la corrida verificada. Por tanto, la tesis no sostiene que los modelos dinámicos FPCA superen al benchmark; sostiene que la representación funcional es una herramienta potente de compresión e interpretación, y que el backtest entrega una prueba rigurosa donde la hipótesis predictiva es rechazada.
+
+\subsection{Objetivos}
+
+El objetivo general es representar, comprimir, interpretar y evaluar predictivamente \SVIs{} de mercados de divisas mediante un enfoque funcional basado en B-splines tensoriales, FPCA y modelos dinámicos en puntajes.
+
+Los objetivos específicos son:
+
+\begin{enumerate}
+  \item Revisar la literatura sobre análisis de datos funcionales, bases B-spline, FPCA, modelos autorregresivos funcionales, regresión no paramétrica y aplicaciones a superficies de volatilidad.
+  \item Construir un panel diario de \SVIs{} para ocho pares de divisas, a partir de datos publicados por Bloomberg entre febrero de 2025 y marzo de 2026.
+  \item Representar cada superficie como una función bidimensional sobre delta y tenor mediante una base B-spline tensorial.
+  \item Aplicar FPCA en la métrica funcional correcta, usando la matriz de Gram y su factorización de Cholesky para evitar distorsiones por la no ortonormalidad de la base.
+  \item Diseñar un backtest fuera de muestra sin filtración temporal, con selección conjunta de ventana de entrenamiento y número de componentes.
+  \item Comparar PM, PA, VAR(1), ARH en incrementos y KernelARH mediante RMSE sobre la malla observada, tasas de acierto y pruebas de Diebold-Mariano.
+  \item Interpretar los resultados distinguiendo éxito descriptivo, desempeño predictivo y fuentes de error de representación, truncación y estimación dinámica.
+\end{enumerate}
+
+\subsection{Hipótesis}
+
+La tesis evalúa tres hipótesis:
+
+\begin{description}
+  \item[H1.] Las \SVIs{} de divisas pueden representarse mediante una estructura FPCA de baja dimensión. Esta hipótesis es apoyada por la evidencia.
+  \item[H2.] Los modelos dinámicos sobre puntajes FPCA mejoran la precisión fuera de muestra frente a la persistencia cruda. Esta hipótesis es rechazada bajo RMSE mediano sobre la malla observada para los ocho pares y tres horizontes evaluados.
+  \item[H3.] La persistencia cruda constituye un benchmark exigente para pronósticos de corto y mediano plazo de \SVIs{}. Esta hipótesis es apoyada por la evidencia empírica.
+\end{description}
+
+\subsection{Organización del trabajo}
+
+La Sección 2 presenta los conceptos financieros básicos: opciones, moneyness, volatilidad implícita y superficies de volatilidad. La Sección 3 revisa literatura sobre FDA, B-splines, FPCA y modelos dinámicos funcionales. La Sección 4 desarrolla con detalle la metodología, desde espacios de Hilbert hasta modelos de pronóstico en puntajes FPCA. La Sección 5 describe los datos y la construcción del panel. Las Secciones 6 y 7 presentan los resultados descriptivos y predictivos. La Sección 8 reporta diagnósticos de estabilidad. Las Secciones 9, 10 y 11 discuten los hallazgos, limitaciones y conclusiones.
+
+\section{Conceptos básicos sobre opciones y superficies de volatilidad implícita}
+
+\subsection{Opciones \emph{vanilla}}
+
+Una opción \emph{vanilla} es un contrato financiero derivado cuyo comprador adquiere un derecho, mas no una obligación, sobre un activo subyacente. Una opción \emph{call} otorga el derecho a comprar el subyacente a un precio de ejercicio \(K\) en una fecha de vencimiento \(T\); una opción \emph{put} otorga el derecho a venderlo. Si \(S_T\) denota el precio del subyacente al vencimiento, los pagos terminales son:
+\[
+  \text{Call}: \max(S_T-K,0),\qquad
+  \text{Put}: \max(K-S_T,0).
+\]
+La prima es el precio que el comprador paga por adquirir ese derecho. En opciones de divisas, el subyacente es un tipo de cambio. Por ejemplo, en USD/PEN el subyacente es el precio del dólar estadounidense expresado en soles peruanos.
+
+\subsection{Moneyness, delta y estructura de la malla}
+
+La \emph{moneyness} compara el precio de ejercicio \(K\) con el precio spot \(S_0\). En términos simples, una opción está \emph{at-the-money} (ATM) cuando \(K\approx S_0\); está \emph{in-the-money} cuando el ejercicio sería favorable bajo las condiciones actuales; y está \emph{out-of-the-money} cuando el ejercicio no sería favorable. Una medida usual es la log-moneyness:
+\[
+  L=\log(K/S_0).
+\]
+Sin embargo, en mercados de divisas la cotización práctica de volatilidades suele organizarse por delta. La delta mide la sensibilidad del precio de la opción frente a cambios en el subyacente y permite ordenar las opciones por exposición económica. La base usada en esta tesis contiene cinco niveles de delta:
+\[
+  \Delta=\{25P,10P,ATM,10C,25C\},
+\]
+que se codifican numéricamente como:
+\[
+  \{-0.25,-0.10,0,0.10,0.25\}.
+\]
+Los niveles negativos corresponden al ala put, el nivel cero al punto ATM y los niveles positivos al ala call.
+
+\subsection{Volatilidad implícita}
+
+La volatilidad implícita es el parámetro \(\sigma\) que, introducido en una fórmula de valorización, iguala el precio teórico de una opción con su precio observado de mercado:
+\[
+  P_{\text{modelo}}(S_0,K,T,\sigma)=P_{\text{mercado}}.
+\]
+No se trata de una volatilidad histórica directamente observada, sino de una variable inferida desde precios. Es una forma compacta de expresar la expectativa y la compensación de riesgo incorporadas por el mercado para distintas opciones.
+
+En un modelo Black-Scholes ideal, todas las opciones sobre un mismo subyacente y vencimiento compartirían una misma volatilidad. En la práctica, la volatilidad implícita varía por strike, delta y tenor. Esa variación produce sonrisas, sesgos y estructuras temporales que contienen información sobre riesgos de cola, demanda de cobertura, liquidez y expectativas macrofinancieras.
+
+\subsection{Superficie de volatilidad implícita}
+
+Una \SVI{} es una función bivariada que asigna una volatilidad implícita a cada combinación de moneyness o delta y vencimiento:
+\[
+  \sigma_{\text{imp}}:(\delta,\tau)\mapsto \sigma_{\text{imp}}(\delta,\tau).
+\]
+En esta tesis, cada superficie se observa en cinco deltas y trece tenores:
+\[
+T=\{1W,2W,1M,2M,3M,6M,9M,1Y,18M,2Y,3Y,4Y,5Y\}.
+\]
+Por tanto, cada superficie diaria tiene \(5\times 13=65\) nodos.
+
+Dos cortes de la superficie son especialmente relevantes. El primero es el \emph{smile} de volatilidad, que fija un vencimiento \(\tau_0\) y observa cómo cambia la volatilidad entre deltas:
+\[
+  \delta\mapsto \sigma_{\text{imp}}(\delta,\tau_0).
+\]
+El segundo es la estructura temporal, que fija un delta, usualmente ATM, y observa cómo cambia la volatilidad por tenor:
+\[
+  \tau\mapsto \sigma_{\text{imp}}(0,\tau).
+\]
+La superficie completa integra ambas dimensiones: forma transversal y estructura temporal.
+
+\subsection{Construcción práctica desde ATM, risk reversal y butterfly}
+
+En opciones de divisas, Bloomberg y otras fuentes de mercado suelen reportar volatilidades mediante cotizaciones estándar ATM, \emph{risk reversal} (RR) y \emph{butterfly} (BF). Sea \(\sigma_{\text{ATM}}\) la volatilidad at-the-money, y \(\sigma_{xC}\), \(\sigma_{xP}\) las volatilidades de call y put con delta \(x\in\{10,25\}\). Las convenciones habituales son:
+\[
+  RR_x=\sigma_{xC}-\sigma_{xP},
+  \qquad
+  BF_x=\frac{\sigma_{xC}+\sigma_{xP}}{2}-\sigma_{\text{ATM}}.
+\]
+Resolviendo el sistema:
+\[
+  \sigma_{xC}=\sigma_{\text{ATM}}+BF_x+\frac{1}{2}RR_x,
+  \qquad
+  \sigma_{xP}=\sigma_{\text{ATM}}+BF_x-\frac{1}{2}RR_x.
+\]
+Así, para cada fecha y tenor se recuperan los cinco puntos \(\{25P,10P,ATM,10C,25C\}\), que constituyen la sección transversal de la superficie.
+
+\subsection{Patrones típicos}
+
+La forma de una \SVI{} suele describirse mediante tres patrones:
+\begin{itemize}
+  \item \textbf{Nivel:} desplazamiento casi paralelo de la superficie; refleja cambios generales en incertidumbre o prima de volatilidad.
+  \item \textbf{Skew o inclinación:} diferencia entre alas put y call; en divisas puede relacionarse con demanda de cobertura ante depreciaciones o apreciaciones extremas.
+  \item \textbf{Curvatura o butterfly:} convexidad del smile; captura la valoración relativa de eventos de cola frente a movimientos moderados.
+\end{itemize}
+Estos patrones motivan la interpretación de las componentes principales funcionales. Si una primera componente mueve casi toda la superficie en la misma dirección, se interpreta como factor de nivel. Si una segunda componente separa alas o tenores, se interpreta como factor de skew, pendiente o curvatura.
+
+\section{Revisión de literatura}
+
+El análisis de datos funcionales extiende métodos estadísticos a observaciones que son curvas, superficies u otros objetos definidos sobre dominios continuos. Ramsay y Silverman \cite{RamsaySilverman2006} establecen el marco clásico para representar funciones mediante bases, estimar componentes principales funcionales y trabajar con métricas en espacios de Hilbert. En contextos de datos escasos o irregulares, James et al. \cite{JamesHastieSugar2000}, Petrovich \cite{Petrovich2018} y Li et al. \cite{Li2020} discuten estrategias de reducción de dimensión y estimación funcional.
+
+Las bases B-spline son particularmente útiles por su soporte local y estabilidad numérica. La construcción de splines se apoya en de Boor \cite{DeBoor2001}; los P-splines y extensiones penalizadas son desarrollados por Eilers y Marx \cite{EilersMarx2003}, Ruppert et al. \cite{Ruppert2003} y Wood \cite{Wood2017}. Para superficies bidimensionales, las bases tensoriales permiten formar funciones de dos variables mediante productos de bases unidimensionales. Reiss y Xu \cite{ReissXu2020} muestran la relevancia de splines tensoriales para componentes principales funcionales.
+
+En finanzas, Cont y Da Fonseca \cite{ContDaFonseca2002} documentan dinámicas de superficies de volatilidad implícita y factores comunes. Fengler et al. \cite{Fengler2003} estudian componentes principales comunes en volatilidades implícitas. Jaimungal y Ng \cite{JaimungalNg2007} aplican FPCA a series financieras, mientras que Grith et al. \cite{Grith2018} desarrollan FPCA para derivados de curvas multivariadas. En mercados de divisas, Kearney et al. \cite{Kearney2018}, Shang y Kearney \cite{ShangKearney2022} y Weaver et al. \cite{Weaver2020} analizan pronósticos de superficies de volatilidad usando enfoques funcionales. Avellaneda et al. \cite{Avellaneda2020} estudian PCA para superficies de volatilidad de opciones sobre índices accionarios. Tan et al. \cite{Tan2024} proponen modelos funcionales de pronóstico de volatilidad.
+
+La dimensión dinámica se relaciona con procesos autorregresivos en espacios de Hilbert. Bosq \cite{Bosq2000} introduce procesos lineales funcionales y modelos ARH; Bosq y Blanke \cite{BosqBlanke2007} extienden inferencia y predicción en alta dimensión. Aue et al. \cite{Aue2015} desarrollan teoría de predicción para series funcionales estacionarias. Mas y Pumo \cite{MasPumo2009} estudian regresión funcional con derivadas. Ferraty y Vieu \cite{FerratyVieu2006} ofrecen fundamentos para regresión funcional no paramétrica. Ruiz-Medina et al. \cite{RuizMedina2019} proponen regresión múltiple dinámica en espacios funcionales con regresores kernel y errores ARH(1). Liang et al. \cite{Liang2022} aplican FDA a volatilidad de alta frecuencia.
+
+Esta tesis se ubica en la intersección de dichas literaturas, pero enfatiza una distinción metodológica: la calidad descriptiva de la FPCA no debe confundirse con superioridad predictiva. Por ello, el componente empírico se diseña como una comparación estricta contra persistencia cruda, que es un benchmark simple pero muy competitivo cuando las superficies son altamente persistentes.
+
+\section{Metodología}
+
+\subsection{Análisis de datos funcionales}
+
+El análisis de datos funcionales aborda datos cuyas observaciones pueden representarse como funciones continuas sobre un dominio. A diferencia de los métodos multivariados tradicionales, donde cada observación es un vector de dimensión fija sin estructura geométrica explícita, en FDA cada observación se interpreta como una realización de una variable aleatoria funcional.
+
+Formalmente, sea \(X\) una variable aleatoria con valores en un espacio funcional \(H\). Una muestra de tamaño \(n\) se escribe como:
+\[
+  X_1,\ldots,X_n,\qquad X_i\in H.
+\]
+En aplicaciones, las funciones rara vez se observan de manera continua. Se observan en una malla finita y, eventualmente, con ruido:
+\[
+  Y_{ij}=X_i(s_{ij})+\varepsilon_{ij},
+  \qquad j=1,\ldots,m_i.
+\]
+El objetivo del análisis funcional es recuperar una representación regularizada de \(X_i\), estudiar su variabilidad y, cuando existe estructura temporal, modelar su evolución.
+
+En esta tesis, cada observación diaria es una superficie \(Y_t(\delta,\tau)\), donde \(t\) indexa la fecha, \(\delta\) el delta y \(\tau\) el tenor. El dominio es bidimensional y compacto:
+\[
+  \mathcal{D}=\Delta\times \mathcal{T}.
+\]
+Aunque los datos se observan en 65 nodos, se asume que provienen de una superficie subyacente suficientemente regular. Esta hipótesis permite usar bases tensoriales y FPCA para separar variación sistemática, ruido de representación y dinámica temporal.
+
+\subsection{Espacios de Hilbert y geometría \(L^2\)}
+
+Para formalizar la representación funcional se utiliza el espacio de Hilbert \(L^2(\mathcal{D})\). Sea \(\mathcal{D}\subset\R^2\) compacto. Se define:
+\[
+  L^2(\mathcal{D})=
+  \left\{
+  f:\mathcal{D}\to\R:
+  \int_{\mathcal{D}} f(s)^2\,ds<\infty
+  \right\}.
+\]
+El producto interno y la norma inducida son:
+\[
+  \inner{f}{g}_{L^2}=\int_{\mathcal{D}} f(s)g(s)\,ds,
+  \qquad
+  \norm{f}_{L^2}=\sqrt{\inner{f}{f}_{L^2}}.
+\]
+En el caso de superficies de volatilidad, \(s=(\delta,\tau)\) y:
+\[
+  \inner{f}{g}_{L^2}
+  =
+  \int_{\Delta}\int_{\mathcal{T}}
+  f(\delta,\tau)g(\delta,\tau)\,d\tau\,d\delta.
+\]
+
+Este marco es importante por cuatro razones. Primero, \(L^2\) es completo: los límites de sucesiones convergentes permanecen dentro del espacio. Segundo, la ortogonalidad está bien definida y permite proyectar superficies sobre subespacios de baja dimensión. Tercero, los operadores compactos de covarianza poseen descomposiciones espectrales, base de la expansión de Karhunen-Loève y de la FPCA. Cuarto, el producto interno define la noción correcta de distancia funcional; sin esta métrica, una PCA aplicada directamente a coeficientes de una base no ortonormal puede distorsionar la variación.
+
+La consecuencia práctica es que no basta con estimar coeficientes en una base. También se debe incorporar la matriz de Gram de esa base para que los productos internos y las componentes principales correspondan a la geometría funcional.
+
+\subsection{Bases B-spline unidimensionales}
+
+Para representar funciones en un dominio compacto \([a,b]\), se emplean bases B-spline por su soporte local, estabilidad numérica y flexibilidad. Sea \(\boldsymbol{\tau}=(\tau_0,\ldots,\tau_M)\) un vector de nodos no decreciente con \(\tau_0=a\) y \(\tau_M=b\). Fijado un grado \(p\), las B-splines se definen recursivamente por Cox-de Boor:
+\[
+B_{k,0}(t)=
+\begin{cases}
+1, & \tau_{k-1}\leq t<\tau_k,\\
+0, & \text{en otro caso},
+\end{cases}
+\]
+\[
+B_{k,p}(t)=
+\frac{t-\tau_{k-1}}{\tau_{k+p-1}-\tau_{k-1}}B_{k,p-1}(t)
++
+\frac{\tau_{k+p}-t}{\tau_{k+p}-\tau_k}B_{k+1,p-1}(t).
+\]
+Cada \(B_{k,p}\) es un polinomio por tramos de grado \(p\), con soporte local y continuidad controlada por la multiplicidad de los nodos. En la tesis se usan splines cúbicos (\(p=3\)), que equilibran suavidad y flexibilidad.
+
+Una función \(f\in L^2([a,b])\) se aproxima como:
+\[
+  f(t)\approx \sum_{k=1}^{K} c_k B_{k,p}(t).
+\]
+Si los datos observados son \(\mathbf{y}=(y_1,\ldots,y_n)^\top\) en puntos \(t_1,\ldots,t_n\), y \(B\) es la matriz de diseño con \(B_{ik}=B_{k,p}(t_i)\), los coeficientes pueden estimarse por mínimos cuadrados:
+\[
+  \widehat{\mathbf{c}}=(B^\top B)^{-1}B^\top \mathbf{y}.
+\]
+Para estabilizar la inversión puede añadirse una penalización ridge:
+\[
+  \widehat{\mathbf{c}}=(B^\top B+\lambda I)^{-1}B^\top \mathbf{y}.
+\]
+
+La matriz de Gram unidimensional es:
+\[
+  G_{kl}=\int_a^b B_{k,p}(t)B_{l,p}(t)\,dt.
+\]
+Si \(f\) y \(g\) tienen coeficientes \(c_f\) y \(c_g\), entonces:
+\[
+  \inner{f}{g}_{L^2}=c_f^\top G c_g.
+\]
+Esta identidad se generaliza directamente al caso bidimensional mediante productos tensoriales.
+
+\subsection{Base tensorial B-spline para superficies}
+
+Sea \(\Delta\) el dominio de delta y \(\mathcal{T}\) el dominio de tenor. Se fijan dos bases B-spline:
+\[
+  \{B_i^\delta(\delta)\}_{i=1}^{K_\delta},
+  \qquad
+  \{B_j^\tau(\tau)\}_{j=1}^{K_\tau}.
+\]
+La base bidimensional se construye con productos:
+\[
+  \Psi_{ij}(\delta,\tau)=B_i^\delta(\delta)B_j^\tau(\tau).
+\]
+Cada superficie diaria se aproxima por:
+\[
+  Y_t(\delta,\tau)
+  \approx
+  \sum_{i=1}^{K_\delta}\sum_{j=1}^{K_\tau}
+  c_{t,ij}B_i^\delta(\delta)B_j^\tau(\tau).
+\]
+
+Sea \(\Phi_\delta\in\R^{5\times K_\delta}\) la matriz de evaluación en los cinco deltas y \(\Phi_\tau\in\R^{13\times K_\tau}\) la matriz de evaluación en los trece tenores. Si \(F_t\in\R^{5\times 13}\) es la matriz diaria de volatilidades, entonces:
+\[
+  F_t\approx \Phi_\delta C_t\Phi_\tau^\top,
+\]
+donde \(C_t\in\R^{K_\delta\times K_\tau}\) contiene los coeficientes. Vectorizando por columnas:
+\[
+  y_t=\operatorname{vec}(F_t)\approx Xc_t,
+  \qquad
+  X=\Phi_\tau\otimes \Phi_\delta,
+  \qquad
+  c_t=\operatorname{vec}(C_t).
+\]
+
+En la implementación final:
+\[
+  K_\delta=4,\qquad K_\tau=8,\qquad K=K_\delta K_\tau=32,
+\]
+con splines cúbicos y penalización ridge \(\lambda=10^{-6}\). Por tanto, cada superficie de 65 nodos se resume mediante 32 coeficientes. La estimación diaria es:
+\[
+  \widehat c_t=(X^\top X+\lambda I)^{-1}X^\top y_t.
+\]
+La superficie ajustada en la malla original es:
+\[
+  \widehat y_t=X\widehat c_t.
+\]
+Este objeto sirve tanto para diagnósticos de ajuste como para construir la persistencia ajustada PA.
+
+\subsection{Métrica funcional y corrección Gram-Cholesky}
+
+La base tensorial no es ortonormal. La matriz de Gram bidimensional es:
+\[
+  G=G_\tau\otimes G_\delta,
+\]
+donde:
+\[
+  (G_\delta)_{ii'}=\int_{\Delta}B_i^\delta(\delta)B_{i'}^\delta(\delta)\,d\delta,
+  \qquad
+  (G_\tau)_{jj'}=\int_{\mathcal{T}}B_j^\tau(\tau)B_{j'}^\tau(\tau)\,d\tau.
+\]
+Para dos superficies con coeficientes \(c_a\) y \(c_b\):
+\[
+  \inner{f_a}{f_b}_{L^2}=c_a^\top G c_b.
+\]
+
+Si se aplicara PCA directamente sobre \(c_t\), se usaría implícitamente el producto \(c_a^\top c_b\), que no coincide con la métrica funcional. Para evitar esta distorsión, se usa la factorización de Cholesky:
+\[
+  G=S^\top S.
+\]
+Con coeficientes centrados \(\widetilde c_t=\widehat c_t-\bar c\), se define:
+\[
+  u_t=S\widetilde c_t.
+\]
+Entonces:
+\[
+  \norm{f_t-\bar f}_{L^2}^2
+  =
+  \widetilde c_t^\top G\widetilde c_t
+  =
+  u_t^\top u_t.
+\]
+La transformación \(c\mapsto Sc\) convierte la métrica funcional en una métrica euclidiana. Por ello, una PCA euclidiana sobre \(u_t\) es equivalente a una FPCA sobre las superficies en \(L^2(\Delta\times \mathcal{T})\).
+
+\subsection{FPCA sobre superficies}
+
+Sea \(U\) la matriz cuyas filas son los vectores \(u_t\). La PCA produce autovectores \(w_k\) y autovalores \(\lambda_k\). Los puntajes funcionales son:
+\[
+  z_{t,k}=u_t^\top w_k.
+\]
+El autovector funcional en coordenadas de la base original se recupera como:
+\[
+  v_k=S^{-1}w_k,
+\]
+y cumple:
+\[
+  v_k^\top Gv_\ell=\mathbb{1}\{k=\ell\}.
+\]
+La \(k\)-ésima eigensuperficie es:
+\[
+  \varphi_k(\delta,\tau)=x(\delta,\tau)^\top v_k.
+\]
+Con \(K_0\) componentes, la reconstrucción de la superficie es:
+\[
+  \widehat Y_{t,K_0}(\delta,\tau)
+  =
+  \bar Y(\delta,\tau)+\sum_{k=1}^{K_0}z_{t,k}\varphi_k(\delta,\tau).
+\]
+
+La proporción de varianza explicada acumulada hasta \(K_0\) es:
+\[
+  FVE(K_0)=\frac{\sum_{k=1}^{K_0}\lambda_k}{\sum_{k=1}^{K}\lambda_k}.
+\]
+En el bloque descriptivo se reportan \(K_{95}\) y \(K_{99}\), los mínimos \(K_0\) que alcanzan 95\% y 99\% de varianza explicada. En el bloque predictivo, \(K_0\) no se fija por FVE global sino por tuning fuera de muestra. Esta diferencia es deliberada: una dimensión óptima para compresión histórica no necesariamente minimiza pérdida predictiva.
+
+\subsection{Modelos de pronóstico}
+
+El backtest compara cinco modelos para pronosticar \(y_{t+h}\) en horizontes \(h\in\{1,5,10\}\).
+
+\subsubsection{Persistencia en malla observada (PM)}
+
+El benchmark principal copia la última superficie observada:
+\[
+  \widehat y_{t+h|t}^{PM}=y_t.
+\]
+PM no estima parámetros, no suaviza y no reconstruye. Por ello, no incurre en error de base ni de truncación FPCA. Es un benchmark simple, pero muy exigente en series altamente persistentes.
+
+\subsubsection{Persistencia de superficie ajustada (PA)}
+
+La persistencia ajustada copia la última superficie suavizada por la base:
+\[
+  \widehat y_{t+h|t}^{PA}=X\widehat c_t.
+\]
+PA permite separar dos efectos: la persistencia temporal y el costo de pasar desde la malla cruda a la representación funcional. Si PA pierde frente a PM, existe evidencia de que la representación suavizada elimina variación relevante para el RMSE de malla.
+
+\subsubsection{VAR(1) en puntajes}
+
+Sea \(z_t\in\R^{K_0}\) el vector de puntajes FPCA. El modelo VAR(1) asume:
+\[
+  z_{t+1}=a+Bz_t+\varepsilon_{t+1},
+  \qquad
+  \E(\varepsilon_{t+1})=0.
+\]
+La estimación se realiza por mínimos cuadrados con regularización ridge:
+\[
+  (\widehat a,\widehat B)
+  =
+  \arg\min_{a,B}
+  \sum_t \norm{z_{t+1}-a-Bz_t}_2^2
+  +\lambda_{VAR}\norm{B}_F^2,
+\]
+con \(\lambda_{VAR}=10^{-2}\). Para horizontes mayores se itera:
+\[
+  \widehat z_{t+k|t}^{VAR}
+  =
+  \widehat a+\widehat B\widehat z_{t+k-1|t}^{VAR}.
+\]
+La superficie se reconstruye desde \(\widehat z_{t+h|t}^{VAR}\) usando la media y las eigensuperficies de la ventana de entrenamiento.
+
+\subsubsection{ARH en incrementos}
+
+El modelo ARH en incrementos preserva el nivel persistente de los puntajes y modela únicamente los cambios:
+\[
+  \Delta z_t=z_t-z_{t-1}.
+\]
+Se supone:
+\[
+  \Delta z_{t+1}=\rho \Delta z_t+\eta_{t+1}.
+\]
+El operador finito-dimensional \(\rho\) se estima mediante un análogo regularizado de Yule-Walker:
+\[
+  \widehat\rho=\widehat C_1(\widehat C_0+\lambda_\rho I)^{-1},
+\]
+donde:
+\[
+  \widehat C_0=\frac{1}{T'}\sum_t \Delta z_t\Delta z_t^\top,
+  \qquad
+  \widehat C_1=\frac{1}{T'}\sum_t \Delta z_{t+1}\Delta z_t^\top,
+\]
+y \(\lambda_\rho=10^{-6}\). El pronóstico a horizonte \(h\) es:
+\[
+  \widehat z_{t+h|t}^{ARHinc}
+  =
+  z_t+\sum_{k=1}^{h}\widehat\rho^{\,k}\Delta z_t.
+\]
+Esta especificación es funcionalmente interpretable como una aproximación truncada de un proceso ARH en un subespacio generado por las primeras \(K_0\) componentes.
+
+\subsubsection{KernelARH}
+
+KernelARH combina una media condicional no paramétrica en el espacio de puntajes con una corrección ARH(1) en residuos. Se parte de:
+\[
+  z_{t+1}=m(z_t)+e_{t+1},
+  \qquad
+  e_{t+1}=\rho e_t+u_{t+1}.
+\]
+La media condicional se estima mediante un suavizador Nadaraya-Watson:
+\[
+  \widehat m_t(z)
+  =
+  \frac{\sum_{i=1}^{t-1}K(d(z,z_i)/h)z_{i+1}}
+       {\sum_{i=1}^{t-1}K(d(z,z_i)/h)}.
+\]
+El núcleo usado es gaussiano:
+\[
+  K(u)=\exp(-u^2/2).
+\]
+La distancia se calcula en coordenadas estandarizadas para evitar que un puntaje de mayor escala domine:
+\[
+  d(z,z')=\norm{D^{-1}(z-z')}_2,
+  \qquad
+  D=\operatorname{diag}(s_1,\ldots,s_{K_0}).
+\]
+Los residuos estimados son:
+\[
+  \widehat e_{t+1}=z_{t+1}-\widehat m_t(z_t),
+\]
+y \(\rho\) se estima con la misma regularización tipo Yule-Walker usada en ARHinc. El pronóstico combina la media no paramétrica y la memoria residual:
+\[
+  \widehat z_{t+1|t}^{KernelARH}
+  =
+  \widehat m_t(z_t)+\widehat\rho\,\widehat e_t.
+\]
+Para horizontes mayores se itera la media condicional y la dinámica residual.
+
+\subsection{Diseño de backtest y tuning}
+
+La evaluación es estrictamente fuera de muestra y se realiza con ventanas móviles. Para cada par se selecciona una ventana de entrenamiento:
+\[
+  W\in\{44,66,88,110,132,154,176,198\},
+\]
+y un número de componentes:
+\[
+  K_0\in\{2,\ldots,15\}.
+\]
+La selección se realiza mediante un procedimiento de tuning interno que usa únicamente información disponible hasta cada fecha de entrenamiento. La FPCA final del backtest se estima localmente en cada ventana, evitando filtración temporal desde observaciones futuras.
+
+La métrica principal es el RMSE en la malla observada:
+\[
+  RMSE_{t,h}^{(m)}
+  =
+  \left[
+  \frac{1}{65}\sum_{q=1}^{65}
+  \left(
+  \widehat y_{t+h|t,q}^{(m)}-y_{t+h,q}
+  \right)^2
+  \right]^{1/2}.
+\]
+Para cada modelo, par y horizonte se reportan mediana, percentiles 25 y 75, tasa de acierto frente a PM y pruebas de Diebold-Mariano.
+
+La tasa de acierto frente a PM se define como:
+\[
+  TA_m(h)=
+  \frac{1}{|\mathcal{T}_{OOS}|}
+  \sum_{t\in\mathcal{T}_{OOS}}
+  \mathbb{1}\{RMSE_{t,h}^{(m)}<RMSE_{t,h}^{(PM)}\}.
+\]
+Las pruebas de Diebold-Mariano se aplican a la diferencia de pérdidas:
+\[
+  d_t=(RMSE_{t,h}^{PM})^2-(RMSE_{t,h}^{m})^2.
+\]
+Con esta convención, un estadístico DM negativo indica que el modelo alternativo tiene mayor pérdida que PM.
+
+\section{Datos}
+
+La base de datos proviene de superficies diarias publicadas por Bloomberg para ocho pares de divisas. Luego del filtrado por superficies completas, cada par cuenta con 299 fechas desde el 4 de febrero de 2025 hasta el 27 de marzo de 2026. Los pares son:
+\[
+\text{USD/PEN, USD/COP, USD/CLP, USD/BRL, USD/ARS, USD/MXN, EUR/USD, USD/ZAR.}
+\]
+Cada fecha contiene 65 nodos formados por cinco deltas y trece tenores. El archivo fuente es \texttt{vols3.xlsx}; la corrida final se generó con \texttt{tesis\_volatilidad\_analysis\_final.R}.
+
+\begin{table}[H]
+\centering
+\caption{Disponibilidad y varianza explicada global por par}
+\label{tab:fpca_global}
+\small
+\begin{tabular}{lrrrrrr}
+\toprule
+Par & Días & PC1 & PC1--PC2 & PC1--PC3 & \(K_{95}\) & \(K_{99}\) \\
+\midrule
+USD/PEN & 299 & 0.7405 & 0.9805 & 0.9937 & 2 & 3 \\
+USD/COP & 299 & 0.9246 & 0.9809 & 0.9962 & 2 & 3 \\
+USD/CLP & 299 & 0.9892 & 0.9964 & 0.9996 & 1 & 2 \\
+USD/BRL & 299 & 0.9877 & 0.9962 & 0.9986 & 1 & 2 \\
+USD/ARS & 299 & 0.9834 & 0.9955 & 0.9983 & 1 & 2 \\
+USD/MXN & 299 & 0.9472 & 0.9845 & 0.9975 & 2 & 3 \\
+EUR/USD & 299 & 0.9566 & 0.9775 & 0.9907 & 1 & 3 \\
+USD/ZAR & 299 & 0.9550 & 0.9871 & 0.9978 & 1 & 3 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+La Tabla \ref{tab:fpca_global} resume el resultado descriptivo central. En todos los pares, la primera componente explica al menos 74.05\% de la varianza funcional; en seis pares supera 94\%. Dos componentes explican entre 97.75\% y 99.64\%, y tres componentes explican entre 99.07\% y 99.96\%. Esto confirma que las \SVIs{} poseen una estructura funcional de baja dimensión.
+
+La calidad de ajuste B-spline también varía por par. La mediana del RMSE de ajuste diario es 0.9164 puntos porcentuales para USD/PEN, 0.6023 para USD/COP, 0.5792 para USD/CLP, 0.6297 para USD/BRL, 1.2879 para USD/ARS, 0.5956 para USD/MXN, 0.3952 para EUR/USD y 0.5525 para USD/ZAR. Este punto es importante para la interpretación predictiva: PM opera directamente sobre la malla observada, mientras que PA y los modelos dinámicos pasan por una representación suavizada y reconstruida.
+
+\section{Resultados descriptivos}
+
+La FPCA global permite interpretar la variación de las superficies. En USD/PEN, la primera componente captura principalmente desplazamientos de nivel de la superficie; la segunda recoge variación de pendiente o curvatura en la interacción delta-tenor; la tercera aporta ajustes más locales. La suma de PC1 y PC2 explica 98.05\%, lo que muestra que la mayor parte de la variación histórica puede resumirse con dos factores funcionales.
+
+\begin{figure}[H]
+\centering
+\maybeinclude[width=0.75\linewidth]{tesis_outputs/usdpen/fig_surface_ajustada.pdf}
+\caption{Ejemplo de superficie ajustada por base B-spline tensorial para USD/PEN.}
+\label{fig:surface_fit}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\maybeinclude[width=0.75\linewidth]{tesis_outputs/usdpen/fig_eigensurf_pc1.pdf}
+\caption{Primera eigensuperficie FPCA para USD/PEN.}
+\label{fig:pc1}
+\end{figure}
+
+El resultado descriptivo no depende únicamente de USD/PEN. Para USD/CLP, USD/BRL y USD/ARS, una sola componente supera 98\% de varianza explicada. Para USD/COP, USD/MXN, EUR/USD y USD/ZAR, una o dos componentes bastan para superar 95\%. La tesis, por tanto, conserva un aporte funcional claro: las superficies cambiarias observadas en la muestra son altamente compresibles e interpretables mediante FPCA.
+
+\subsection{Dinámica de puntajes FPCA}
+
+La varianza explicada resume la importancia de cada componente, pero los puntajes FPCA permiten estudiar cómo evolucionan los factores en el tiempo. Para facilitar la comparación entre pares, los signos de las componentes se orientan de modo que un aumento de un desvío estándar del puntaje produzca, en promedio, un desplazamiento positivo de la superficie reconstruida. Esta convención solo fija el signo, que en FPCA es arbitrario, y no altera la varianza explicada ni la autocorrelación.
+
+\begin{figure}[H]
+\centering
+\maybeinclude[width=0.9\linewidth]{tesis_outputs/fig_fpca_scores_all_pairs.pdf}
+\caption{Puntajes FPCA estandarizados de las tres primeras componentes por par.}
+\label{fig:fpca_scores_all}
+\end{figure}
+
+\begin{table}[H]
+\centering
+\caption{Dinámica de puntajes FPCA globales}
+\label{tab:fpca_scores}
+\small
+\begin{tabular}{lrrrrrrr}
+\toprule
+Par & FVE1 & FVE2 & FVE3 & \(\rho_1\)(PC1) & \(\rho_1\)(PC2) & \(\Delta\)PC1/sd & \(\Delta\)PC2/sd \\
+\midrule
+USD/PEN & 0.741 & 0.240 & 0.013 & 0.834 & 0.915 & -3.79 & 2.31 \\
+USD/COP & 0.925 & 0.056 & 0.015 & 0.868 & 0.968 & -3.51 & 1.60 \\
+USD/CLP & 0.989 & 0.007 & 0.003 & 0.933 & 0.979 & 0.91 & -1.55 \\
+USD/BRL & 0.988 & 0.008 & 0.002 & 0.941 & 0.759 & 1.37 & 2.72 \\
+USD/ARS & 0.983 & 0.012 & 0.003 & 0.986 & 0.897 & 1.76 & 0.29 \\
+USD/MXN & 0.947 & 0.037 & 0.013 & 0.864 & 0.977 & -0.21 & -3.03 \\
+EUR/USD & 0.957 & 0.021 & 0.013 & 0.826 & 0.801 & 0.47 & -1.08 \\
+USD/ZAR & 0.955 & 0.032 & 0.011 & 0.903 & 0.963 & 2.73 & -0.84 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+La Tabla \ref{tab:fpca_scores} muestra que los puntajes son persistentes. La autocorrelación de primer orden de PC1 se ubica entre 0.826 y 0.986, y la de PC2 alcanza valores superiores a 0.96 en USD/COP, USD/CLP, USD/MXN y USD/ZAR. Por tanto, la ausencia de mejora predictiva no se debe a que los factores carezcan de memoria temporal. El problema es más específico: la memoria de los puntajes, al ser proyectada, truncada y reconstruida, no reduce el error frente a copiar la malla observada.
+
+Los pares también difieren en el tipo de dinámica latente. USD/PEN es el caso más bifactorial: PC1 explica 74.1\% y PC2 24.0\%, con desplazamientos netos de -3.79 y 2.31 desvíos estándar, respectivamente. Esto indica una rotación importante entre dos factores funcionales, no solo un cambio de nivel. USD/COP también tiene una PC2 persistente, aunque su peso de varianza es menor. USD/CLP, USD/BRL y USD/ARS son más unifactoriales: PC1 explica entre 98.3\% y 98.9\%, por lo que la dinámica global se concentra en un factor de nivel dominante. USD/MXN, EUR/USD y USD/ZAR se ubican en una zona intermedia, con PC1 cercana a 95\% y componentes secundarias persistentes que capturan cambios de forma.
+
+\section{Resultados predictivos fuera de muestra}
+
+\subsection{Tuning seleccionado}
+
+El tuning conjunto selecciona ventanas y números de componentes distintos por par. Esto evidencia heterogeneidad temporal y evita imponer una misma ventana a todos los mercados. La Tabla \ref{tab:tuning} muestra la configuración final.
+
+\begin{table}[H]
+\centering
+\caption{Ventana de entrenamiento y \(K_0\) seleccionados por par y horizonte}
+\label{tab:tuning}
+\small
+\begin{tabular}{lrrrr}
+\toprule
+Par & \(TRAIN\_SIZE\) & \(K_0(h=1)\) & \(K_0(h=5)\) & \(K_0(h=10)\) \\
+\midrule
+USD/PEN & 44 & 4 & 4 & 4 \\
+USD/COP & 154 & 7 & 8 & 8 \\
+USD/CLP & 88 & 7 & 6 & 7 \\
+USD/BRL & 132 & 7 & 6 & 5 \\
+USD/ARS & 110 & 8 & 7 & 5 \\
+USD/MXN & 88 & 7 & 6 & 6 \\
+EUR/USD & 110 & 8 & 8 & 6 \\
+USD/ZAR & 66 & 5 & 4 & 3 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+El hecho de que el \(K_0\) predictivo sea mayor que el \(K_0\) descriptivo de 95\% o 99\% en varios pares no contradice el resultado de baja dimensión. El \(K_0\) global mide varianza explicada histórica; el \(K_0\) del backtest se selecciona localmente para minimizar un criterio predictivo. Aun así, los diagnósticos rolling muestran que los subespacios locales retienen casi toda la varianza: la FVE mediana por ventana se mantiene cerca de uno en los pares y horizontes evaluados.
+
+\subsection{RMSE mediano por par y horizonte}
+
+La Tabla \ref{tab:rmse_best} resume el hallazgo predictivo principal. En cada par y horizonte se reporta el RMSE mediano de PM y el mejor RMSE mediano entre las alternativas no PM. En los 24 casos, PM presenta menor RMSE mediano.
+
+\begin{longtable}{llrrrl}
+\caption{RMSE mediano: PM frente a la mejor alternativa no PM}
+\label{tab:rmse_best}\\
+\toprule
+Par & \(h\) & PM & Mejor alt. & Brecha & Modelo alt. \\
+\midrule
+\endfirsthead
+\toprule
+Par & \(h\) & PM & Mejor alt. & Brecha & Modelo alt. \\
+\midrule
+\endhead
+USD/PEN & 1 & 0.1200 & 0.9670 & 0.8470 & PA \\
+USD/PEN & 5 & 0.3227 & 0.9998 & 0.6771 & ARHinc \\
+USD/PEN & 10 & 0.4223 & 1.0394 & 0.6171 & PA \\
+USD/COP & 1 & 0.1504 & 0.5356 & 0.3852 & PA \\
+USD/COP & 5 & 0.4321 & 0.6613 & 0.2292 & PA \\
+USD/COP & 10 & 0.6441 & 0.8070 & 0.1629 & ARHinc \\
+USD/CLP & 1 & 0.1614 & 0.6272 & 0.4658 & PA \\
+USD/CLP & 5 & 0.4087 & 0.7015 & 0.2928 & PA \\
+USD/CLP & 10 & 0.6239 & 0.8122 & 0.1883 & KernelARH \\
+USD/BRL & 1 & 0.1972 & 0.6654 & 0.4682 & PA \\
+USD/BRL & 5 & 0.5848 & 0.8287 & 0.2439 & ARHinc \\
+USD/BRL & 10 & 0.7676 & 0.9835 & 0.2159 & PA \\
+USD/ARS & 1 & 0.1729 & 1.2766 & 1.1037 & PA \\
+USD/ARS & 5 & 0.4415 & 1.3542 & 0.9127 & PA \\
+USD/ARS & 10 & 0.6258 & 1.4207 & 0.7949 & PA \\
+USD/MXN & 1 & 0.1470 & 0.6072 & 0.4602 & PA \\
+USD/MXN & 5 & 0.3419 & 0.6646 & 0.3227 & PA \\
+USD/MXN & 10 & 0.4251 & 0.6899 & 0.2648 & PA \\
+EUR/USD & 1 & 0.1588 & 0.4205 & 0.2617 & PA \\
+EUR/USD & 5 & 0.3741 & 0.5367 & 0.1626 & PA \\
+EUR/USD & 10 & 0.4908 & 0.5982 & 0.1074 & PA \\
+USD/ZAR & 1 & 0.1750 & 0.6052 & 0.4302 & PA \\
+USD/ZAR & 5 & 0.4172 & 0.7071 & 0.2899 & ARHinc \\
+USD/ZAR & 10 & 0.5551 & 0.7759 & 0.2208 & ARHinc \\
+\bottomrule
+\end{longtable}
+
+Este resultado rechaza la hipótesis predictiva H2. La conclusión no es que la representación funcional carezca de valor, sino que, bajo RMSE sobre la malla cruda, el beneficio potencial de modelar puntajes FPCA no compensa el costo de suavizado, truncación y estimación dinámica frente a PM.
+
+\subsection{Detalle USD/PEN}
+
+USD/PEN es el par de mayor interés aplicado para la tesis. En la corrida final se selecciona \(TRAIN\_SIZE=44\) y \(K_0=4\) para los tres horizontes, con 245 predicciones fuera de muestra por horizonte. La Tabla \ref{tab:usdpen_rmse} muestra los resultados completos.
+
+\begin{table}[H]
+\centering
+\caption{USD/PEN: RMSE mediano OOS por modelo}
+\label{tab:usdpen_rmse}
+\small
+\begin{tabular}{llrrrr}
+\toprule
+\(h\) & Modelo & Mediana & P25 & P75 & \(p\)-valor DM \\
+\midrule
+1 & PM & 0.1200 & 0.0736 & 0.2274 & -- \\
+1 & PA & 0.9670 & 0.9027 & 1.0483 & 0.0000 \\
+1 & VAR1 & 7.5540 & 3.1547 & 15.3386 & 0.0000 \\
+1 & ARHinc & 0.9679 & 0.9023 & 1.0489 & 0.0000 \\
+1 & KernelARH & 0.9727 & 0.9035 & 1.0617 & 0.0000 \\
+5 & PM & 0.3227 & 0.1930 & 0.5221 & -- \\
+5 & PA & 1.0014 & 0.9320 & 1.0962 & 0.0000 \\
+5 & VAR1 & 10.8560 & 4.5433 & 27.0935 & 0.0242 \\
+5 & ARHinc & 0.9998 & 0.9309 & 1.0930 & 0.0000 \\
+5 & KernelARH & 1.0076 & 0.9218 & 1.1194 & 0.0000 \\
+10 & PM & 0.4223 & 0.2703 & 0.6606 & -- \\
+10 & PA & 1.0394 & 0.9503 & 1.1695 & 0.0000 \\
+10 & VAR1 & 8.9306 & 3.8355 & 23.4599 & 0.0344 \\
+10 & ARHinc & 1.0430 & 0.9470 & 1.1680 & 0.0000 \\
+10 & KernelARH & 1.0566 & 0.9563 & 1.1854 & 0.0000 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Los signos de las pruebas de Diebold-Mariano son negativos porque el diferencial se define como pérdida de PM menos pérdida del modelo alternativo. En USD/PEN, todos los modelos no PM son estadísticamente inferiores a PM en los tres horizontes. Además, las tasas de acierto frente a PM son prácticamente nulas: PA, VAR1 y ARHinc no superan a PM en ninguna fecha fuera de muestra; KernelARH solo alcanza 0.8\% en \(h=5\) y 0.4\% en \(h=10\).
+
+\begin{figure}[H]
+\centering
+\maybeinclude[width=0.8\linewidth]{tesis_outputs/usdpen/fig_oos_boxplot.pdf}
+\caption{USD/PEN: distribución de errores OOS por modelo y horizonte.}
+\label{fig:usdpen_box}
+\end{figure}
+
+\subsection{Tasas de acierto y pruebas DM}
+
+Las tasas de acierto confirman que las alternativas rara vez superan a PM en fechas individuales. Aunque existen excepciones puntuales, especialmente en horizontes de 10 días para KernelARH en algunos pares, ninguna alternativa domina en mediana de RMSE. El mayor caso observado es KernelARH para USD/BRL en \(h=10\), con una tasa de acierto de 27.4\%; aun así, su RMSE mediano es 0.9991 frente a 0.7676 de PM.
+
+En las pruebas Diebold-Mariano, 86 de las 96 comparaciones modelo-horizonte-par identifican inferioridad estadísticamente significativa de la alternativa frente a PM al 5\%. En las 10 comparaciones restantes, no hay evidencia estadística de mejora de la alternativa; en todas ellas la mediana de RMSE de PM sigue siendo menor. Por tanto, el resultado global no depende de un único par ni de una sola especificación dinámica.
+
+\section{Diagnósticos de estabilidad}
+
+Los diagnósticos ayudan a interpretar por qué la baja dimensión descriptiva no se traduce en superioridad predictiva.
+
+Primero, los subespacios FPCA locales son estables en términos de varianza explicada. La FVE mediana rolling se mantiene por encima de 0.9989 en los pares y horizontes evaluados. Esto indica que el problema no es una incapacidad de la FPCA para representar las ventanas locales.
+
+Segundo, VAR1 muestra fragilidad numérica. Sus radios espectrales medianos están cerca de uno, entre 0.926 y 0.993 según el par y horizonte, y el radio espectral máximo supera uno en todos los pares. En USD/PEN, el radio espectral mediano es 0.926 y el máximo 1.302; los ratios de norma alcanzan percentiles 95 de 7.62, 18.32 y 25.06 para \(h=1,5,10\), respectivamente. Esta cercanía a la no estacionariedad se refleja en errores medianos muy elevados para VAR1.
+
+Tercero, ARHinc y KernelARH son más estables que VAR1, pero su estabilidad no basta para superar a PM. En USD/PEN, ARHinc tiene radio espectral mediano 0.337, percentil 95 de 0.529 y ninguna ventana con radio mayor o igual a uno. KernelARH tiene radio mediano 0.682, percentil 95 de 0.870 y proporción de radios mayores o iguales a uno de 0.004. Aun así, ambos modelos presentan RMSE medianos cercanos a PA y muy superiores a PM.
+
+\section{Discusión}
+
+El hallazgo central de la tesis es que la compresión funcional y la precisión predictiva no son equivalentes. Las \SVIs{} de la muestra se describen muy bien con pocos factores, pero los modelos dinámicos sobre esos factores no reducen el RMSE de pronóstico frente a copiar la última superficie observada. Esta diferencia tiene varias explicaciones.
+
+Primero, las superficies de volatilidad son altamente persistentes. En horizontes cortos, una regla sin estimación puede capturar gran parte de la señal relevante. PM es un benchmark fuerte precisamente porque no intenta separar señal y ruido: reproduce la última observación completa.
+
+Segundo, PM no incurre en error de reconstrucción. En cambio, PA y los modelos dinámicos pasan por la base B-spline. Este paso suaviza la superficie y puede eliminar movimientos locales pequeños que sí afectan el RMSE punto a punto sobre la malla observada. En USD/PEN, la mediana del RMSE de ajuste B-spline es 0.9164 puntos porcentuales, superior al RMSE mediano de PM en los tres horizontes (0.1200, 0.3227 y 0.4223). Esta comparación ilustra por qué una representación funcional descriptivamente útil puede estar en desventaja bajo una métrica cruda de malla.
+
+Tercero, el truncamiento FPCA reduce dimensión pero también filtra variación. La varianza filtrada puede ser pequeña en términos funcionales globales y, al mismo tiempo, relevante para errores locales en nodos específicos. La FPCA optimiza representación de varianza histórica, no necesariamente pérdida de pronóstico punto a punto.
+
+Cuarto, los modelos dinámicos añaden error de estimación. VAR1 es particularmente vulnerable por su cercanía a raíces unitarias y por la inestabilidad de algunas ventanas. ARHinc y KernelARH son más estables, pero su mejora dinámica no compensa el costo de reconstrucción frente a PM.
+
+Quinto, la heterogeneidad de ventanas seleccionadas sugiere no estacionariedad local. USD/PEN selecciona una ventana corta de 44 días, mientras que USD/COP selecciona 154 días y USD/BRL 132 días. No existe una ventana universal que capture por igual la dinámica de todos los pares. Esta heterogeneidad es esperable en mercados con distinta microestructura, liquidez y sensibilidad macrofinanciera.
+
+El resultado negativo es metodológicamente relevante. Rechazar una hipótesis predictiva frente a un benchmark fuerte no invalida la tesis; al contrario, delimita con precisión qué aporta el enfoque funcional. La FPCA sirve para representar, comprimir e interpretar superficies. El backtest muestra que esta ventaja descriptiva no garantiza superioridad predictiva bajo RMSE crudo y horizontes cortos o medianos.
+
+\section{Limitaciones}
+
+La primera limitación es la longitud de la muestra. Aunque 299 superficies completas representan una base valiosa para mercados latinoamericanos, siguen siendo pocas observaciones para estimar modelos dinámicos flexibles, especialmente variantes kernel o sistemas VAR de dimensión moderada.
+
+La segunda limitación es la métrica de evaluación. El RMSE sobre malla observada favorece modelos que reproducen directamente los nodos crudos. PM no impone suavidad, no reconstruye y no filtra ruido. En aplicaciones de valorización, gestión de riesgo o construcción de superficies económicamente consistentes, podrían ser relevantes otras métricas que ponderen tenores, deltas, no arbitraje o pérdidas económicas.
+
+La tercera limitación es que los pronósticos usan únicamente información interna de la superficie. No se incorporan variables exógenas como spot, tasas de interés, diferencial de tasas, carry, liquidez, precios de commodities o indicadores de estrés. Tales variables podrían ser relevantes para horizontes mayores.
+
+La cuarta limitación es que la representación no impone restricciones explícitas de no arbitraje. La tesis se centra en representación estadística y evaluación predictiva sobre una malla fija, no en garantizar convexidad, monotonicidad u otras condiciones económicas de precios de opciones en todo el dominio.
+
+La quinta limitación es la dependencia de la malla Bloomberg. La disponibilidad de una malla completa facilita la comparación, pero también implica que se trabaja con superficies ya procesadas por una fuente de datos. En mercados menos líquidos, la construcción primaria de la superficie desde cotizaciones de opciones puede introducir desafíos adicionales.
+
+\section{Conclusiones}
+
+Esta tesis evaluó un enfoque funcional para \SVIs{} de divisas en mercados latinoamericanos y comparó su desempeño predictivo frente a un benchmark exigente de persistencia cruda. La conclusión principal es que el enfoque funcional es descriptivamente exitoso, pero no predictivamente superior bajo el diseño de backtest evaluado.
+
+En la dimensión descriptiva, los resultados son contundentes. Los ocho pares cuentan con 299 superficies completas entre el 4 de febrero de 2025 y el 27 de marzo de 2026. La FPCA con corrección métrica muestra que una o dos componentes explican al menos 95\% de la variación funcional, y dos o tres componentes explican al menos 99\%. En USD/PEN, las dos primeras componentes explican 98.05\% y las tres primeras 99.37\%. Esto confirma H1: las \SVIs{} poseen una estructura funcional de baja dimensión.
+
+En la dimensión predictiva, la evidencia rechaza H2. En los ocho pares y tres horizontes evaluados, PM obtiene el menor RMSE mediano. Las alternativas PA, VAR1, ARHinc y KernelARH no superan de manera sistemática el benchmark. En USD/PEN, el resultado es especialmente claro: PM registra RMSE medianos de 0.1200, 0.3227 y 0.4223 para \(h=1,5,10\), mientras que las mejores alternativas no PM registran 0.9670, 0.9998 y 1.0394. Las pruebas DM indican inferioridad estadística de las alternativas en todos los horizontes de USD/PEN.
+
+La evidencia también apoya H3. La persistencia cruda es un benchmark difícil porque las superficies son persistentes y porque PM no incurre en errores de suavizado, truncación o estimación. El éxito descriptivo de FPCA no garantiza menor pérdida predictiva sobre una malla cruda.
+
+El aporte final de la tesis es, por tanto, una lectura equilibrada. La metodología funcional proporciona una representación parsimoniosa, interpretable y reproducible de superficies de volatilidad implícita. El ejercicio de pronóstico, diseñado sin filtración temporal y comparado contra una referencia fuerte, muestra que los modelos dinámicos en puntajes FPCA no mejoran la precisión fuera de muestra bajo RMSE en esta muestra. Este resultado negativo es informativo para investigación y práctica: antes de introducir dinámica sofisticada, es indispensable medir su valor incremental frente a persistencia cruda.
+
+\section{Trabajo futuro}
+
+Una primera extensión consiste en ampliar la muestra temporal y repetir el backtest a medida que Bloomberg acumule nuevas superficies completas. Más observaciones permitirán estudiar estabilidad por régimen, eventos macroeconómicos y cambios de liquidez.
+
+Una segunda línea consiste en incorporar variables exógenas. Modelos VARX, regresiones funcionales con covariables o modelos de estado podrían incorporar spot, tasas, carry, inflación, commodities o indicadores de riesgo global.
+
+Una tercera extensión es evaluar pérdidas alternativas. Para aplicaciones de trading o riesgo, podría ser más relevante ponderar nodos por sensibilidad, liquidez o exposición de cartera, en lugar de usar RMSE uniforme sobre la malla.
+
+Una cuarta línea es integrar restricciones de forma y no arbitraje. La representación B-spline podría combinarse con penalizaciones o proyecciones que preserven regularidad económica, especialmente si el objetivo es usar las superficies para valorización directa.
+
+Finalmente, se puede explorar modelamiento con cambios de régimen. La heterogeneidad de ventanas seleccionadas sugiere que dinámicas con parámetros variables en el tiempo, modelos Markov-switching o filtros adaptativos podrían representar mejor episodios de estrés o intervención.
+
+\appendix
+\section{Archivos reproducibles}
+
+La corrida final se generó con el script \texttt{tesis\_volatilidad\_analysis\_final.R} y el archivo \texttt{vols3.xlsx}. Los resultados agregados quedaron organizados en \texttt{tesis\_outputs/}. Los archivos principales son:
+
+\begin{itemize}
+  \item \texttt{tesis\_outputs/multi\_moneda\_status.csv}
+  \item \texttt{tesis\_outputs/resumen\_disponibilidad\_fpca.csv}
+  \item \texttt{tesis\_outputs/resumen\_tuning\_train\_k0.csv}
+  \item \texttt{tesis\_outputs/resumen\_rmse\_mediana.csv}
+  \item \texttt{tesis\_outputs/resumen\_rmse\_wide.csv}
+  \item \texttt{tesis\_outputs/resumen\_tasa\_aciertos.csv}
+  \item \texttt{tesis\_outputs/resumen\_dm.csv}
+  \item \texttt{tesis\_outputs/resumen\_estabilidad\_modelos.csv}
+\end{itemize}
+
+\begin{thebibliography}{99}
+
+\bibitem{Aue2015}
+Aue, A., Norinho, D. D., \& Hörmann, S. (2015). On the Prediction of Stationary Functional Time Series. \emph{Journal of the American Statistical Association}, 110(509), 378--392. \url{https://doi.org/10.1080/01621459.2014.909317}
+
+\bibitem{Avellaneda2020}
+Avellaneda, M., Healy, B., Papanicolaou, A., \& Papanicolaou, G. (2020). PCA for Implied Volatility Surfaces. arXiv:2002.00085. \url{https://doi.org/10.48550/arXiv.2002.00085}
+
+\bibitem{Bosq2000}
+Bosq, D. (2000). \emph{Linear Processes in Function Spaces}. Springer. \url{https://doi.org/10.1007/978-1-4612-1154-9}
+
+\bibitem{BosqBlanke2007}
+Bosq, D., \& Blanke, D. (2007). \emph{Inference and Prediction in Large Dimensions}. Wiley. \url{https://doi.org/10.1002/9780470724033}
+
+\bibitem{ContDaFonseca2002}
+Cont, R., \& Da Fonseca, J. (2002). Dynamics of Implied Volatility Surfaces. \emph{Quantitative Finance}, 2(1), 45--60. \url{https://doi.org/10.1088/1469-7688/2/1/304}
+
+\bibitem{DeBoor2001}
+de Boor, C. (2001). \emph{A Practical Guide to Splines}. Springer. \url{https://doi.org/10.1137/1022106}
+
+\bibitem{DieboldMariano1995}
+Diebold, F. X., \& Mariano, R. S. (1995). Comparing Predictive Accuracy. \emph{Journal of Business \& Economic Statistics}, 13(3), 253--263. \url{https://doi.org/10.1080/07350015.1995.10524599}
+
+\bibitem{EilersMarx2003}
+Eilers, P. H. C., \& Marx, B. D. (2003). Multivariate calibration with temperature interaction using two-dimensional penalized signal regression. \emph{Chemometrics and Intelligent Laboratory Systems}, 66(2), 159--174. \url{https://doi.org/10.1016/S0169-7439(03)00029-7}
+
+\bibitem{FahrmeirTutz2001}
+Fahrmeir, L., \& Tutz, G. (2001). \emph{Multivariate Statistical Modelling Based on Generalized Linear Models}. Springer. \url{https://doi.org/10.1007/978-1-4757-3454-6}
+
+\bibitem{Fengler2003}
+Fengler, M. R., Härdle, W. K., \& Villa, C. (2003). The Dynamics of Implied Volatilities: A Common Principal Components Approach. \emph{Review of Derivatives Research}, 6(3), 179--202. \url{https://doi.org/10.1023/B:REDR.0000004823.77464.2d}
+
+\bibitem{FerratyVieu2006}
+Ferraty, F., \& Vieu, P. (2006). \emph{Nonparametric Functional Data Analysis: Theory and Practice}. Springer.
+
+\bibitem{Grith2018}
+Grith, M., Wagner, H., Härdle, W. K., \& Kneip, A. (2018). Functional Principal Component Analysis for Derivatives of Multivariate Curves. \emph{Statistica Sinica}. \url{https://doi.org/10.5705/ss.202017.0199}
+
+\bibitem{Hagan2002}
+Hagan, P., Kumar, D., Lesniewski, A., \& Woodward, D. (2002). Managing Smile Risk. \emph{Wilmott Magazine}, 1, 84--108.
+
+\bibitem{Heston1993}
+Heston, S. L. (1993). A Closed-Form Solution for Options with Stochastic Volatility with Applications to Bond and Currency Options. \emph{Review of Financial Studies}, 6(2), 327--343. \url{https://doi.org/10.1093/rfs/6.2.327}
+
+\bibitem{JaimungalNg2007}
+Jaimungal, S., \& Ng, E. K. H. (2007). Consistent Functional PCA for Financial Time-Series. \emph{Proceedings of the Fourth IASTED International Conference on Financial Engineering and Applications}, 103--108. \url{https://www.utstat.toronto.edu/sjaimung/papers/VAR-FPCA.pdf}
+
+\bibitem{JamesHastieSugar2000}
+James, G., Hastie, T., \& Sugar, C. (2000). Principal Component Models for Sparse Functional Data. \emph{Biometrika}, 87(3), 587--602. \url{https://doi.org/10.1093/biomet/87.3.587}
+
+\bibitem{Kearney2018}
+Kearney, F., Cummins, M., \& Murphy, F. (2018). Forecasting Implied Volatility in Foreign Exchange Markets: A Functional Time Series Approach. \emph{The European Journal of Finance}, 24(1), 1--18. \url{https://doi.org/10.1080/1351847X.2016.1271441}
+
+\bibitem{Li2020}
+Li, C., Xiao, L., \& Luo, S. (2020). Fast Covariance Estimation for Multivariate Sparse Functional Data. \emph{Stat}, 9(1), e245. \url{https://doi.org/10.1002/sta4.245}
+
+\bibitem{Liang2022}
+Liang, Z., Weng, F., Ma, Y., Xu, Y., Zhu, M., \& Yang, C. (2022). Measurement and Analysis of High Frequency Asset Volatility Based on Functional Data Analysis. \emph{Mathematics}, 10(7), 1140. \url{https://doi.org/10.3390/math10071140}
+
+\bibitem{MasPumo2009}
+Mas, A., \& Pumo, B. (2009). Functional Linear Regression with Derivatives. \emph{Journal of Nonparametric Statistics}, 21(1), 19--40. \url{https://doi.org/10.1080/10485250802401046}
+
+\bibitem{Petrovich2018}
+Petrovich, J. (2018). \emph{Functional Principal Component Analysis and Sparse Functional Regression}. PhD Thesis, Pennsylvania State University.
+
+\bibitem{RamsaySilverman2006}
+Ramsay, J. O., \& Silverman, B. W. (2006). \emph{Functional Data Analysis}. Springer.
+
+\bibitem{ReissXu2020}
+Reiss, P. T., \& Xu, M. (2020). Tensor product splines and functional principal components. \emph{Journal of Statistical Planning and Inference}, 208, 1--12. \url{https://doi.org/10.1016/j.jspi.2019.10.006}
+
+\bibitem{RuizMedina2019}
+Ruiz-Medina, M. D., Miranda, D., \& Espejo, R. M. (2019). Dynamical Multiple Regression in Function Spaces, Under Kernel Regressors, with ARH(1) Errors. \emph{TEST}, 28(3), 943--968. \url{https://doi.org/10.1007/s11749-018-0614-2}
+
+\bibitem{Ruppert2003}
+Ruppert, D., Wand, M. P., \& Carroll, R. J. (2003). \emph{Semiparametric Regression}. Cambridge University Press. \url{https://doi.org/10.1017/CBO9780511755453}
+
+\bibitem{ShangKearney2022}
+Shang, H. L., \& Kearney, F. (2022). Dynamic Functional Time-Series Forecasts of Foreign Exchange Implied Volatility Surfaces. \emph{International Journal of Forecasting}, 38(3), 1025--1049. \url{https://doi.org/10.1016/j.ijforecast.2021.07.011}
+
+\bibitem{Sui2020}
+Sui, C., Lung, P., \& Yang, M. (2020). Predictable Dynamics in the Implied Volatility Surface Based on Weighted Least Squares: Evidence from Soybean Meal Futures Options in China. \emph{Emerging Markets Finance and Trade}, 56(11), 2625--2638. \url{https://doi.org/10.1080/1540496X.2019.1616543}
+
+\bibitem{Tan2024}
+Tan, Y., Tan, Z., Tang, Y., \& Zhang, Z. (2024). Functional Volatility Forecasting. \emph{Journal of Forecasting}, 43(8), 3009--3034. \url{https://doi.org/10.1002/for.3170}
+
+\bibitem{Weaver2020}
+Weaver, C., Perryman, B., Jiang, J., Chien, A., Meoded, E., \& Kirk, A. (2020). \emph{Functional PCA for Implied Volatility Surface Prediction}. MetLife Investment Management.
+
+\bibitem{Wood2017}
+Wood, S. N. (2017). \emph{Generalized Additive Models: An Introduction with R}. Chapman \& Hall/CRC. \url{https://doi.org/10.1201/9781315370279}
+
+\end{thebibliography}
+
+\end{document}
