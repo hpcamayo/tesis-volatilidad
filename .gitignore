@@ -1,0 +1,23 @@
+.DS_Store
+.Rhistory
+.RData
+.Ruserdata
+Rplots.pdf
+
+# LaTeX build artifacts
+*.aux
+*.bbl
+*.bcf
+*.blg
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.run.xml
+*.synctex.gz
+*.toc
+
+# Editor and OS noise
+.idea/
+.vscode/
+*~

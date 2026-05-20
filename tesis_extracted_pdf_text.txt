@@ -1,0 +1,1769 @@
+===== PAGE 1 =====
+
+Predicción de Superficies de Volatilidad Implícita en Mercados
+Latinoamericanos: Un Enfoque Funcional
+Autor:Henri Paul Camayo Guillermo,henri.camayo@pucp.pe
+Asesora:Dra. Felícita Doris Miranda Huaynalaya,fdmirandah@pucp.edu.pe
+15 de diciembre de 2025
+
+===== PAGE 2 =====
+
+Índice
+1. Introducción 3
+1.1. Objetivos de la Tesis . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 6
+1.2. Organización del Trabajo . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 6
+2. Conceptos básicos sobre opciones y superficies de volatilidad implícita 7
+2.1. Opcionesvanilla. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 7
+2.2. Relaciónmoneyness. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 7
+2.3. Volatilidad implícita (VI) . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 8
+2.4. Superficie de volatilidad implícita (SVI) . . . . . . . . . . . . . . . . . . . . . 8
+2.5. Patrones típicos . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 8
+3. Metodología 9
+3.1. Análisis de Datos Funcionales (FDA) . . . . . . . . . . . . . . . . . . . . . . . 9
+3.2. Espacio de Hilbert . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 9
+3.3. Aproximación funcional mediante bases B-spline . . . . . . . . . . . . . . . . . 11
+3.4. Base tensorial B-spline para superficies bidimensionales . . . . . . . . . . . . . 13
+3.5. Descomposición en Componentes Principales Funcionales (FPCA) sobre super-
+ficies bidimensionales . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 16
+3.6. Regresión kernel en puntajes FPCA con errores ARH(1) . . . . . . . . . . . . 18
+3.7. Modelos de referencia . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 22
+3.7.1. Persistencia en la malla observada (PM) . . . . . . . . . . . . . . . . . 23
+3.7.2. Persistencia de la superficie ajustada (PA) . . . . . . . . . . . . . . . . 23
+3.7.3. Autorregresivo vectorial de orden 1 en puntajes (VAR(1)) . . . . . . . 23
+3.7.4. ARH(1) en incrementos de puntajes (ARH-inc) . . . . . . . . . . . . . 24
+3.7.5. Resumen de modelos y comparabilidad . . . . . . . . . . . . . . . . . . 24
+4. Aplicación: Componentes Principales Funcionales de las SVI 25
+4.1. Descripción de los Datos . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 25
+1
+
+===== PAGE 3 =====
+
+4.2. Preprocesamiento y conformación del panel . . . . . . . . . . . . . . . . . . . 27
+4.3. Ajuste diario sobre base B-spline tensorial . . . . . . . . . . . . . . . . . . . . 27
+4.4. FPCA de superficies en la métrica funcional . . . . . . . . . . . . . . . . . . . 29
+5. Modelos dinámicos en puntajes FPCA con dependencia autorregresiva 33
+5.1. Diseño del backtest OOS y modelos comparados . . . . . . . . . . . . . . . . . 34
+5.2. Elección deK 0 . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 34
+5.3. Resultados principales OOS . . . . . . . . . . . . . . . . . . . . . . . . . . . . 35
+5.4. Robustez: distribución de errores y tasa de aciertos . . . . . . . . . . . . . . . 36
+6. Conclusiones 38
+6.1. Limitaciones . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 40
+6.2. Líneas de investigación futura . . . . . . . . . . . . . . . . . . . . . . . . . . . 40
+2
+
+===== PAGE 4 =====
+
+1. Introducción
+En los mercados de derivados financieros, la superficie de volatilidad implícita (SVI)
+representa la estructura tridimensional que asigna un nivel de volatilidad a cada combinación
+de precio de ejercicio y vencimiento de una opción cotizada. Esta superficie, inferida a partir
+de los precios de mercado, constituye una herramienta crítica para el cálculo de los precios de
+opciones, la cobertura de riesgos y la búsqueda de oportunidades de arbitraje. Sin embargo, los
+mercados de opciones de América Latina presentan características estructurales que dificultan
+su modelamiento: poca liquidez y variedad de opciones, precios de ejercicio irregulares y
+diferenciales bid-ask (precios de compra-venta) significativos. En este contexto, disponer
+de pronósticos confiables de la SVI no solo mejora los ingresos por creación de mercado,
+al permitir coberturas más ajustadas y estrategias de arbitraje de volatilidad entre plazos,
+sino que fortalece la gestión de riesgo en tesorerías bancarias y mesas de derivados. En la
+práctica profesional, la construcción de la SVI suele abordarse mediante modelos paramétricos
+como Heston (1993) y SABR (Hagan et al., 2002), los cuales permiten calibrar superficies
+coherentes con los precios de opciones en un momento dado. No obstante, su aplicabilidad
+en mercados con datos dispersos o escasos es limitada, y su rigidez estructural puede generar
+errores sistemáticos en entornos de baja liquidez. Estas limitaciones motivan la exploración de
+enfoques estadísticos más flexibles, capaces de capturar la complejidad empírica de las SVI sin
+imponer supuestos restrictivos. Esta necesidad ha sido documentada en mercados emergentes
+como en China, donde Sui et al. (2020) evidencian que las SVI presentan dinámicas y patrones
+que divergen significativamente de los observados en economías desarrolladas, desafiando la
+validez de enfoques paramétricos tradicionales en mercados emergentes.
+Frente a estas limitaciones, el análisis de datos funcionales (FDA) emerge como una
+alternativa robusta y flexible, capaz de capturar estructuras complejas y evolutivas como las SVI
+sindependerdesupuestosparamétricosrígidos.Estadisciplinaextiendelosmétodosestadísticos
+clásicos al análisis de objetos funcionales, como curvas o superficies, permitiendo describir
+su variabilidad y dinámica mediante herramientas de reducción de dimensión, suavizado
+y descomposición en componentes principales (Functional Principal Component Analysis,
+FPCA). El trabajo de Ramsay y Silverman (2006) constituye una referencia seminal en la
+formalización de estos métodos y su aplicación a problemas estadísticos complejos. Existen
+estudios previos que analizaron los factores latentes de las SVI, tanto mediante aproximaciones
+funcionales como en formulaciones multivariadas discretas, como Cont y Da Fonseca (2002) y
+Fengler et al. (2003). Posteriormente, Jaimungal y Ng (2007) formalizaron la aplicación de la
+FPCA a series financieras con muestreo irregular; un enfoque que fue ampliado por Grith et al.
+(2018), que aplican la FPCA directamente sobre superficies funcionales de densidad de precios
+Arrow–Debreu (derivadas de segundo orden de precios de opciones). Más recientemente,
+3
+
+===== PAGE 5 =====
+
+diversos autores han empleado FPCA para el análisis y pronóstico de SVI en mercados
+desarrollados, como para opciones sobre acciones del S&P500 (Avellaneda et al., 2020) y pares
+de divisas del G10 (Kearney et al., 2018; Shang & Kearney, 2022; Weaver et al., 2020). Estos
+estudios refuerzan la utilidad del análisis funcional para capturar la dinámica empírica de
+la volatilidad en mercados líquidos y sirven de referencia metodológica para aplicaciones en
+mercados en desarrollo.
+El desarrollo reciente de fuentes de datos densas y regulares, como las superficies diarias
+publicadas por Bloomberg desde febrero de 2025 para el par de divisas Dólar vs. Sol Peruano,
+presenta oportunidades para el estudio de la volatilidad implícita en mercados en desarrollo.
+En este nuevo contexto, la disponibilidad de mallas completas y uniformes en los ejes de
+delta y vencimiento permite modelar las SVI como superficies funcionales bidimensionales
+definidas sobre dominios densos, lo cual abre la puerta a enfoques basados en bases tensoriales
+B-spline. Estas bases fueron desarrolladas originalmente en el marco de los P-splines de Eilers
+y Marx (2003) y posteriormente formalizadas en contextos de modelos aditivos por Wood
+(2017). Su estructura se construye a partir del producto de Kronecker entre bases unidimensio-
+nales de cada eje (de Boor (2001) y Ruppert et al. (2003)), generando un espacio funcional
+bidimensional de soporte compacto y alta flexibilidad. Más recientemente, Reiss y Xu (2020)
+demostraron que las superficies tensoriales penalizadas ofrecen una representación explícita de
+los componentes principales funcionales, proporcionando un marco unificado para el suavizado
+y la descomposición espectral de covarianzas. Este enfoque permite controlar de manera
+explícita el grado de suavidad mediante la densidad y ubicación de los nodos, preservando la
+estabilidad numérica y la ortogonalidad de las funciones base mediante correcciones métricas
+derivadas de la matriz de Gram–Cholesky (Fahrmeir & Tutz, 2001; Ramsay & Silverman,
+2006). En consecuencia, las bases tensoriales B-spline proporcionan un marco metodológico
+robusto para representar la variabilidad conjunta de las SVI a lo largo de sus dos dimensiones
+fundamentales: delta y tenor, facilitando su análisis y posterior descomposición funcional.
+Por otro lado, el análisis dinámico de datos funcionales fue formalizado por Bosq (2000),
+quien introduce los procesos autorregresivos en espacios de Hilbert (ARH). Extiende las
+ecuaciones de Yule–Walker al dominio funcional y establece condiciones de consistencia bajo
+dependencia serial. Esto permite modelar directamente la evolución temporal de funciones
+completas en lugar de vectores de observaciones discretas. Bosq y Blanke (2007) extienden este
+marco a contextos de alta dimensión, explorando escenarios en que la representación funcional
+requiere truncamientos de base elevados. Mas y Pumo (2009) exploran la regresión funcional
+incorporando derivadas de primer y segundo orden como predictores, lo cual permite modelar
+interacciones más complejas entre curvas, aunque sin considerar dependencias temporales
+explícitas. Esta limitación es abordada por Aue et al. (2015), quienes proponen una teoría
+de predicción para series funcionales estacionarias, utilizando operadores de covarianza y
+4
+
+===== PAGE 6 =====
+
+descomposiciones espectrales para estimar predictores lineales de mínima varianza. Tan et al.
+(2024) adoptan un enfoque secuencial, aplicando primero una FPCA clásica sobre SVI y
+modelando luego sus puntajes principales con un modelo VAR. Como alternativa a estos
+enfoques estructurados, Ferraty y Vieu (2006) ofrecen un modelo no paramétrico basado
+en regresión kernel, que evita suposiciones de linealidad o estacionariedad estricta y facilita
+la estimación de estructuras de dependencia no lineales. Un método similar fue aplicado
+recientemente por Liang et al. (2022) para modelar la volatilidad de activos financieros en
+contexto de alta frecuencia, empleando técnicas de suavizado y regresión funcional local sin
+asumir estructuras dinámicas explícitas. Por último, Ruiz-Medina et al. (2019) proponen
+un enfoque centrado en la estimación de operadores de autovalores y autocovarianza en el
+espacio de Hilbert en presencia de errores funcionales autocorrelacionados. El modelo combina
+regresores kernel con una estructura autorregresiva de tipo ARH(1) en los errores, integrando
+así relaciones no lineales entre funciones y dependencias dinámicas en un marco de regresión
+funcional.
+En este contexto, la presente tesis propone un enfoque para representar y predecir superficies
+de volatilidad implícita en un mercado latinoamericano aprovechando la disponibilidad reciente
+de datos densos. El método integra tres bloques: (i) representación funcional de cada superficie
+mediante una base B-spline tensorial sobre los ejes de delta y tenor, con una corrección
+métrica para operar en el espacio L2; (ii) reducción de dimensión mediante Análisis de
+Componentes Principales Funcional (FPCA), con el fin de extraer un conjunto parsimonioso de
+factores latentes que resumen la dinámica relevante de la SVI; y (iii) aplicación de un modelo
+predictivo en el espacio de puntajes de la FPCA, donde se comparan estrategias dinámicas de
+distinta complejidad (persistencia, VAR en puntajes, modelos autorregresivos tipo ARH sobre
+incrementos, y una variante no paramétrica basada en distancias tipo kernel), incorporando
+dependencia temporal remanente a través de una estructura autorregresiva de tipo ARH(1).
+A diferencia de los enfoques que formulan la predicción directamente sobre objetos funcio-
+nales completos, esta tesis privilegia un flujo de trabajo unificado (representación→ FPCA
+→ regresión en puntajes) que mantiene la interpretación funcional de las superficies, pero
+reduce el problema de pronóstico a una dimensión baja donde la estimación fuera de muestra
+es más estable y el backtest (pruebas a fechas pasadas) es más transparente. La evaluación
+empírica se realiza mediante pronóstico móvil (rolling windows) y métricas sobre la malla fija,
+cuantificando tanto el error de representación (ajuste por base) como el desempeño fuera de
+muestra en distintos horizontes temporales.
+5
+
+===== PAGE 7 =====
+
+1.1. Objetivos de la Tesis
+El objetivo principal de esta tesis es representar y predecir las superficies de volatilidad
+implícita (SVI) de los mercados de opciones latinoamericanos mediante un modelo funcional
+integral que combina bases tensoriales B-spline, descomposición en componentes principales
+funcionales (FPCA) y regresión funcional con errores autorregresivos de tipo ARH(1). De
+manera específica:
+Revisar la literatura sobre análisis de datos funcionales, descomposición en componen-
+tes principales funcionales, suavizado mediante bases B-spline tensoriales, y modelos
+autorregresivos funcionales ARH(1) aplicados a series financieras.
+Construir una base de datos diaria de superficies de volatilidad implícita (SVI) para
+opciones de divisas en mercados latinoamericanos, a partir de información publicada por
+Bloomberg desde febrero de 2025.
+Representar las superficies de volatilidad implícita como funciones bidimensionales
+continuas sobre los ejes de delta y tenor, utilizando una base tensorial B-spline con
+corrección métrica mediante la matriz de Gram–Cholesky para preservar la ortogonalidad
+en el espacioL2(δ, τ).
+Aplicar la descomposición en componentes principales funcionales (FPCA) a la familia
+de superficies estimadas, y determinar el número óptimo de componentes a retener
+mediante criterios de varianza explicada y estabilidad espectral.
+Implementar y comparar modelos predictivos en el espacio de puntajes de la FPCA:
+persistencia, VAR en puntajes, modelos autorregresivos tipo ARH sobre incrementos y
+una alternativa no paramétrica basada en kernel, incorporando dependencia temporal
+mediante una estructura autorregresiva de tipo ARH(1).
+Validar el desempeño del modelo propuesto mediante procedimientos de validación
+cruzada y pronóstico móvil (rolling windows), evaluando métricas de error como RMSE
+y estabilidad de los componentes.
+Comparar la capacidad predictiva del modelo con enfoques de referencia, como el modelo
+funcional autorregresivo de vectores (FVAR) y el método ingenuo (naive), a fin de
+cuantificar su mejora relativa en precisión y estabilidad.
+1.2. Organización del Trabajo
+El capítulo 2 ofrece una síntesis de los conceptos y términos fundamentales relacionados
+a las opciones y SVI que son usados a lo largo de la tesis. En el capítulo 3, se revisan los
+6
+
+===== PAGE 8 =====
+
+fundamentos teóricos del análisis de datos funcionales, la estimación de componentes principales
+funcionales, los modelos de regresión no paramétrica y los procesos autorregresivos en espacios
+de Hilbert. En el Capítulo 4, se desarrolla la representación funcional de las superficies de
+volatilidad implícita para los mercados latinoamericanos utilizando una base tensorial B-spline
+con corrección métrica mediante la matriz de Gram–Cholesky, y se determina el número óptimo
+de factores mediante FPCA. En el capítulo 5, se especifican y evalúan modelos de pronóstico
+en el espacio de puntajes de la FPCA bajo un diseño de validación fuera de muestra (rolling
+windows), comparando benchmarks de persistencia con alternativas lineales y no paramétricas,
+e incorporando dependencia temporal mediante una estructura autorregresiva de tipo ARH(1).
+Finalmente, el capítulo 7 presenta las conclusiones y recomendaciones para investigaciones
+futuras.
+2. Conceptos básicos sobre opciones y superficies de volatilidad
+implícita
+2.1. Opcionesvanilla
+Opción call: Contrato que otorga al comprador el derecho, mas no la obligación, de
+comprar un activo subyacente a un precio de ejercicioR en la fecha de vencimientoT.
+Pago al vencimiento:m´ ax(ST −R,0).
+Opción put: Derecho a vender el subyacente aRenT. Pago:m´ ax(R−ST ,0).
+Prima: Precio que el comprador paga hoy por adquirir la opción.
+SubyacenteS: Activo respecto del cual se escribe la opción (acción, divisa, índice).
+Plazo o vencimientoT: Tiempo hasta la fecha de ejercicio; en la superficie se expresa
+como “time to maturity” (TTM).
+2.2. Relaciónmoneyness
+Lamoneynessde una opción compara el strikeRcon el precio actual del subyacenteS0:
+At-the-money (ATM):R≈S 0.
+In-the-money (ITM): para opciones callS0 > R; para opciones putS0 < R.
+Out-of-the-money (OTM): para opciones callS0 < R; para opciones putS0 > R.
+7
+
+===== PAGE 9 =====
+
+Conviene usar lalog–moneynessL = log
+ 
+R/S0
+
+; así, L = 0indica ATM, L < 0indica
+opciones call ITM (y opciones put OTM), yL >0lo contrario.
+2.3. Volatilidad implícita (VI)
+Se denota como el parámetroσ que, introducido en la fórmula de Black–Scholes (u otro
+modelo de valoración), iguala el precio teórico al precio de mercado de la opción:
+PrecioBS(S0, R, T, σ) =Precio mercado.
+La VI resume la expectativa de volatilidad del mercado y permite comparar opciones con
+distintosRyT.
+2.4. Superficie de volatilidad implícita (SVI)
+Función bivariadaσimp : (R, T) 7− →σ, que asigna una volatilidad implícita (imp) a cada
+combinación de log–moneynessLy plazoT.
+Tiene dos cortes que son usualmente estudiados:
+Smilede volatilidad: Se fija un vencimiento concretoT = T0 y se graficaσimp(L, T0)
+frente al log-moneynessL = log(K/S0). El resultado es la clásica “sonrisa” (smile) que
+muestra cómo la volatilidad implícita varía entre opciones ITM (L < 0), ATM (L = 0) y
+OTM (L > 0) para ese plazo específico. Sirve para evaluar la asimetría y la curvatura
+de la distribución implícita de retornos a corto, medio o largo plazo.
+Estructura temporal (term structure): Se fijaL = 0(ATM) y se traza σimp(0, T)contra
+el tiempo a vencimientoT. Este corte revela cómo la volatilidad implícita evoluciona
+desde plazos cortos hasta largos, indicando si el mercado anticipa mayor incertidumbre
+a corto plazo (estructura descendente) o a largo plazo (estructura ascendente).
+2.5. Patrones típicos
+Skew: asimetría entre colas; VI más alta para opciones put OTM que para opciones call
+OTM.
+Smile/curvatura: forma de “U”; mínima VI en ATM, mayor en colas (especialmente en
+plazos cortos)
+Butterfly: cambios en la convexidad de la smile; se observa al mover simultáneamente
+las VI de ambas colas.
+8
+
+===== PAGE 10 =====
+
+Estos conceptos se emplearán para describir las componentes principales (resultados de la
+FPCA) y para interpretar los efectos estimados en los modelos de predicción.
+3. Metodología
+3.1. Análisis de Datos Funcionales (FDA)
+El análisis de datos funcionales es un área de la estadística que aborda datos cuyas
+observaciones pueden representarse como funciones continuas en un dominio específico. A
+diferencia de los métodos multivariados tradicionales, donde las observaciones son vectores con
+dimensión fija, en FDA cada observación se modela como una función definida sobre un intervalo
+continuo (por ejemplo, tiempo o vencimiento). Este enfoque es especialmente útil cuando las
+observaciones están densamente medidas o pueden interpolarse con cierta precisión, y cuando
+se desea capturar propiedades como suavidad, derivabilidad, o dependencias estructurales
+internas. El trabajo de Ramsay y Silverman (2006) es seminal para la formalización de las
+técnicas de FDA y constituye la referencia principal de la presente sección.
+Formalmente, se considera una variable aleatoria funcionalX(t)definida sobre un dominio
+continuo t∈ T ⊂I R . Una muestra funcional consiste enn funciones observadasXi(t)n
+i=1, cada
+una correspondiente a diferentes unidades o periodos de tiempo.
+En la práctica, estas funciones rara vez se observan completamente. En cambio, se tiene
+acceso a observaciones discretas y ruidosas:
+Yij =X i(tij) +ε ij, j= 1, . . . , m i,
+dondeε ij es un error de medición y los tiempostij pueden variar entre unidades.
+3.2. Espacio de Hilbert
+Para formalizar el análisis de datos funcionales (FDA), es necesario definir el espacio
+matemático en el cual residen las observaciones funcionales (curvas, superficies o trayectorias).
+El marco natural para este propósito es el espacio de Hilbert, que generaliza las propiedades
+de los espacios euclideanos de dimensiones finitas a contextos infinitamente dimensionales.
+Definición:
+Sea T⊆R un dominio compacto (ej. tiempo hasta vencimiento, madurez o precio de
+ejercicio). Se define:
+9
+
+===== PAGE 11 =====
+
+L2(T) =
+n
+f:T→R
+
+Z
+T
+f(t) 2 dt <∞
+o
+,
+con producto interno y norma inducida:
+⟨f, g⟩=
+Z
+T
+f(t)g(t)dt,∥f∥=
+p
+⟨f, f⟩.
+Propiedades:
+Completitud: Toda sucesión de Cauchyfn ⊆L 2(T )converge en norma a algún f∈
+L2(T ). Esto garantiza que los límites de aproximaciones numéricas (ej. refinamiento
+de malla o aumento del orden de la base) permanecen dentro del espacio. Además,
+asegura la existencia de soluciones en problemas de minimización (ej. mínimos cuadrados
+penalizados).
+Ortogonalidad y proyección: Para un subespacio cerradoV⊆L 2 existe un proyector
+ortogonal PV :L 2 →V único tal quef−P V f⊥V y |f−P V f| = m´ ınv∈V |f−v| . Este
+resultado sustenta los mínimos cuadrados funcionales y la FPCA: proyectar sobre el
+subespacio generado por las autofunciones minimiza el error cuadrático.
+Bases ortonormales y operadores de Hilbert–Schmidt: Existen familias ortonormales
+φk densas en L2 (teorema de Parseval). Los operadores lineales compactos con núcleo
+cuadrado-integrable sonHilbert–Schmidt(Bosq, 2000). Esto permite representar cualquier
+función como serieP
+k ξkφk y garantiza que el operador de covarianza de un proceso
+funcional posea espectro discreto, base de la expansión de Karhunen–Loève usada más
+adelante.
+Teorema de representación de Riesz: En todo espacio de Hilbert, incluidoL2(T ), cada
+funcional lineal y contínuoℓ:L 2 →R se expresa de forma única como producto interno:
+ℓ(f) = ⟨f, g⟩ para algún g∈L 2(T ). Esto garantiza que cualquier evaluación lineal sobre
+funciones (ej. extracción de puntajes en FPCA, o coeficientes en la base B-spline) sea
+una operación contínua y bien definida, incluso cuando los datos se observan con ruido o
+en mallas discretas.
+Por ejemplo, seaσimp(R, T)la volatilidad implícita para un strikeR fijo en la madurezT.
+FijandoT=T 0, se obtiene:
+R7→σ imp(R, T0)∈L 2([Rm´ ın, Rm´ ax])
+10
+
+===== PAGE 12 =====
+
+Cada fecha de negociación aporta una realización funcional (ej. la SVIR7→σ imp(R, T0)
+sobre un intervalo compacto de strikes). El conjunto completo se modela como una muestra
+i.i.d. enL 2.
+De esta forma, es posible representar funciones mediante combinaciones finitas de funciones
+base, lo cual facilita tanto la aproximación numérica como la estimación estadística de los
+objetos funcionales.
+3.3. Aproximación funcional mediante bases B-spline
+Para representar funciones cuadrado–integrables en un dominio compactoT = [a, b] ⊂R
+se empleará una base B-spline, por su estabilidad numérica, soporte local y control explícito
+de suavidad (de Boor, 2001; Ramsay & Silverman, 2006; Ruppert et al., 2003).
+Definición (Cox–de Boor):
+Sea un vector de nodos no decrecienteτ = (τ0, . . . , τM)con τ0 = a y τM = b. Fijado el
+gradop≥1(ordenp+ 1), las B-splines{B k,p}K
+k=1, con
+K=M+p−1,
+se definen recursivamente por
+Bk,0(t) =
+
+
+
+1, τ k−1 ≤t < τ k,
+0,en otro caso,
+Bk,p(t) = t−τ k−1
+τk+p−1 −τ k−1
+Bk,p−1(t) + τk+p −t
+τk+p −τ k
+Bk+1,p−1(t).
+Cada Bk,p es un polinomio por tramos de gradop con soporte local[τk−1, τk+p]y satisface par-
+tición de la unidad:PK
+k=1 Bk,p(t) = 1para todo t∈ [a, b]. Toda f∈L 2([a, b])suficientemente
+regular se aproxima como
+f(t)≈
+KX
+k=1
+ck Bk,p(t),c= (c 1, . . . , cK)⊤.
+Propiedades:
+Soporte local y dispersión: ck solo afecta a f en[ τk−1, τk+p]. La matriz de diseño
+B ∈R n×K, con elementosB ik = Bk,p(ti), es dispersa y de banda limitada (ancho
+≈2p+ 1), lo que mejora el condicionamiento numérico.
+Suavidad controlable: con nodos simples,Bk,p ∈C p−1; nodos repetidos reducen conti-
+nuidad en el punto. En la práctica, cúbicas (p = 3) equilibran flexibilidad y estabilidad.
+11
+
+===== PAGE 13 =====
+
+Invarianza de escala local: se adaptan bien a reparametrizaciones suaves (por ejemplo,
+transformaciones de tenor en logaritmos), que permiten colocar nodos donde la función
+cambia más rápido.
+Estimación:
+Dados datos ruidososy= ( y1, . . . , yn)⊤ en puntost= ( t1, . . . , tn), con matriz de diseño
+Bik =B k,p(ti), la estimación por mínimos cuadrados es
+bcLS = arg m´ ın
+c
+∥y−Bc∥ 2 = (B⊤B)−1B⊤y.
+Para controlar la suavidad global se usa la versión penalizada
+bcλ = arg m´ ın
+c
+∥y−Bc∥ 2 +λc ⊤Pc,
+dondePimplementa una penalización de curvatura
+Z b
+a
+ 
+f (m)(t)
+2 dt
+(expresada en la baseBk,p), típicamente conm = 2(Ramsay & Silverman, 2006; Ruppert
+et al., 2003). Este esquema penalizado se generaliza naturalmente al caso bidimensional
+mediante productos tensoriales, donde Reiss y Xu (2020) demostraron que la forma de la
+penalización influye directamente en los autovalores y autovectores obtenidos en el análisis de
+componentes principales funcionales, proporcionando un marco unificado para el suavizado y
+la descomposición espectral. El parámetroλ≥ 0regula el compromiso sesgo–varianza:λ→ 0
+tiende a interpolar;λ→ ∞fuerza soluciones muy lisas.
+Métrica funcional:
+La matriz de GramG∈R K×K,
+Gkl =
+Z b
+a
+Bk,p(t)B l,p(t)dt,
+induce el producto interno⟨f, g⟩ =c ⊤
+f G cg en el subespacio generado por la base. Esta métrica
+será esencial para corregir la PCA euclideana en coeficientes y operar en el espacio funcional
+L2 (secciones de producto tensorial y FPCA).
+Elección de hiperparámetros:
+Grado:p= 3por defecto (continuidadC 2 con nodos simples).
+Ubicación y número de nodos: más densos donde la función varía rápido; más espa-
+ciados en regiones lisas. Se puede aplicar como criterio el equiespaciado en una escala
+transformada (p.ej., log-tenor) o por cuantiles (Ruppert et al., 2003).
+12
+
+===== PAGE 14 =====
+
+Penalización: selección por GCV, BIC, o validación sobre ventanas, cuando se emplea
+penalización global (Ramsay & Silverman, 2006).
+Esta sección describe la base unidimensional. A continuación se construirá la base bidi-
+mensional para superficies f(δ, τ)mediante producto tensorial de dos bases B-spline, y se
+introducirá la corrección métrica de Gram–Cholesky y el diseño de Kronecker que se usarán
+en el resto de la tesis.
+3.4. Base tensorial B-spline para superficies bidimensionales
+Esta sección formaliza la representación de superficies de volatilidad implícita como
+funciones en dos variablesf(δ, τ)mediante una base B-spline tensorial. El objetivo es obtener
+una parametrización flexible, estable y con métrica funcional explícita para su posterior
+descomposición en componentes principales.
+Dominios y bases unidimensionales:
+Sea∆ = [ δm´ ın, δm´ ax] ⊂R el dominio de moneyness (o delta) yT = [τm´ ın, τm´ ax] ⊂R el
+dominio de tenor. Se fijan dos bases B-spline unidimensionales:
+{B(δ)
+i (δ)}Kδ
+i=1,{B (τ)
+j (τ)} Kτ
+j=1,
+con grados cúbicos y vectores de nodos posiblemente distintos en cada eje (de Boor, 2001;
+Ramsay & Silverman, 2006; Ruppert et al., 2003). Se denota porΦδ ∈R nδ×Kδ yΦ τ ∈R nτ ×Kτ
+las matrices de diseño que evalúan estas bases en las mallas de observación
+δ= (δ 1, . . . , δnδ)⊤,τ= (τ 1, . . . , τnτ )⊤,
+es decir,(Φ δ)ui =B (δ)
+i (δu)y(Φ τ)vj =B (τ)
+j (τv).
+Producto tensorial y vectorización:
+La base bidimensional se construye como productos
+n
+B(δ)
+i (δ)B (τ)
+j (τ)
+o
+i=1,...,Kδ;j=1,...,K τ
+.
+Cualquier superficie suficientemente regularf∈L 2(∆×T)se aproxima por
+f(δ, τ)≈
+KδX
+i=1
+KτX
+j=1
+cij B(δ)
+i (δ)B (τ)
+j (τ),
+con coeficientes cij desconocidos. En la malla rectangular {(δu, τv)}, la matriz de valores
+F∈R nδ×nτ tiene elementosF uv =f(δ u, τv)y se factoriza como
+F≈Φ δ CΦ ⊤
+τ , C∈R Kδ×Kτ ,(C) ij =c ij.
+13
+
+===== PAGE 15 =====
+
+Al apilar por columnas convec(F)∈R nδnτ yvec(C)∈R KδKτ, se obtiene la forma lineal
+y= vec(F)≈Xc, X= Φ τ ⊗Φ δ ∈R (nδnτ )×(KδKτ ),c= vec(C).
+Aquí, ⊗ denota el producto de Kronecker. Esta identidad es estándar en modelos aditivos y
+superficies tensoriales (Wood, 2017).
+Estimación mediante mínimos cuadrados por día:
+Dado un díat con observaciones ruidosasy(t)
+uv ≈f t(δu, τv), apiladas eny(t) = vec(F (t)), se
+estiman los coeficientes tensoriales por mínimos cuadrados
+bc(t) = arg m´ ın
+c
+y(t) −Xc
+2 = (X ⊤X) −1X ⊤y(t).
+Si existen celdas ausentes, se define un vectorm(t) ∈ { 0, 1}nδnτ y se restringe a las filas
+observadas:X (t) =X[m (t) = 1,·],y (t) =y (t)[m(t) = 1], lo que da
+bc(t) =
+ 
+(X(t))⊤X(t)−1(X(t))⊤y(t).
+En el caso homogéneo (misma malla todos los días),X se precalcula una vez; el término
+normal(X ⊤X) −1X ⊤ se reutiliza para todos lost.
+Métrica funcional y corrección Gram–Cholesky:
+El espacioL 2(∆×T)induce el producto interno
+⟨f, g⟩=
+Z
+∆
+Z
+T
+f(δ, τ)g(δ, τ)dτ dδ.
+En coordenadas de la base tensorial, la métrica está dada por la matriz de Gram
+G=G τ ⊗G δ,(G δ)ii′ =
+Z
+∆
+B(δ)
+i (δ)B (δ)
+i′ (δ)dδ,(G τ)jj ′ =
+Z
+T
+B(τ)
+j (τ)B (τ)
+j′ (τ)dτ,
+de modo que⟨f, g⟩ =c ⊤
+f G cg (Ramsay & Silverman, 2006). Para realizar PCA en el espacio
+funcional y no en el espacio euclideano de coeficientes, se utiliza la factorización de Cholesky
+G=S ⊤S.
+Con coeficientes centradosec(t) =bc(t) − ¯c, donde ¯c es la media temporal, se define la transfor-
+mación estandarizada respecto de la métricaL2,
+u(t) =S ec(t) ∈R KδKτ .
+la cual es una isometría inducida por la factorización de CholeskyG=S⊤Sdel operador de
+Gram.
+La PCA euclidiana sobre{u(t)}t es algebraicamente equivalente a una FPCA con la métrica
+L2(∆ ×T ). Siw k denota el k-ésimo autovector obtenido en el espacio transformado{u(t)},
+los eigenvectores en el espacio de coeficientes se recuperan como
+vk =S −1 wk,∥v k∥2
+G =v ⊤
+k Gv k = 1,
+14
+
+===== PAGE 16 =====
+
+donde G = S⊤S es la matriz de Gram. Esta corrección evita sesgos debidos a bases no
+ortonormales.
+Reconstrucción y evaluación:
+Para visualizar o evaluar superficies, se construyen matrices de diseñoΦ⋆
+δ yΦ ⋆
+τ en rejillas
+densas; el diseño tensorial es
+X ⋆ = Φ ⋆
+τ ⊗Φ ⋆
+δ.
+La superficie media y las deformaciones según componentes principales (escala±1desviación
+estándar en el espacio blanqueado) se obtienen como
+bf ⋆
+media =X ⋆ ¯c, bf ⋆
+media±k =X ⋆ (¯c±v k σk),
+dondeσ k es la desviación estándar de los puntajest7→w⊤
+k u(t).
+Diagnósticos y criterios de especificación:
+PRESS (Prediction Error Sum of Squares) y matriz sombrero: En el caso homogéneo,
+H = X(X ⊤X)−1X ⊤. La aproximación leave-one-out (LOO) del residuo en el puntoi es
+eLOO
+i =e i/(1−h ii), dondee i es el residuo ordinario yhii lai-ésima diagonal deH.
+PRESS =
+X
+i
+ ei
+1−h ii
+2
+.
+Así, medianas y percentiles del RMSE derivado deeLOO
+i se utilizan para comparar
+especificaciones y guiar la elección deKδ, Kτ.
+Apalancamientos: hii cercanos a 1 indican interpolación local; su concentración por
+región (alas o tenores cortos) sugiere incrementar flexibilidad en el eje correspondiente.
+Residuos por celda: Mapas de calor deF− bF por( δ, τ)permiten detectar falta de ajuste
+sistemática en alas o bordes (motiva reubicar nodos).
+Sensibilidaddesubespacios:Distanciasentreproyeccionesdesubespacios span{v1, . . . ,vK}
+bajo pequeñas variaciones enKδ, Kτ sirven para evaluar estabilidad de las direcciones
+principales.
+Aspectos numéricos y convenciones.
+Orden de apilado: Se adoptay= vec(F )con tenor variando más rápido (column-major);
+en esta convenciónX= Φ τ ⊗Φ δ.
+Condición de rango: Es necesariorank(X) = KδKτ (o de X(t) por día) para identificar
+c. ElegirK δ, Kτ con margen respecto anδ, nτ y evitar bases excesivas.
+15
+
+===== PAGE 17 =====
+
+Gramycuadraturas: Gδ y Gτ seevalúanporintegraciónexactadeB-splinesocuadraturas
+(Gauss–Legendre) suficientemente finas;G = Gτ ⊗G δ y S = chol(G)han de ser bien
+condicionadas (de Boor, 2001; Ramsay & Silverman, 2006).
+Bordes: Colocar nodos externos repetidos (ordenp + 1) mejora estabilidad en extremos
+y reduce artefactos de extrapolación.
+3.5. Descomposición en Componentes Principales Funcionales (FPCA)
+sobre superficies bidimensionales
+Esta sección desarrolla la FPCA cuando cada observación diaria es una superficie escalar
+X(δ, τ) ∈L 2(∆ ×T )y su representación numérica se ha obtenido mediante una base B-spline
+tensorial. Denote por
+bX(t)(δ, τ) =
+KX
+k=1
+bc(t)
+k Ψk(δ, τ), K=K δKτ ,
+la aproximación de la superficie del díat en la base producto{Ψk}, con vector de coeficientes
+bc(t) = (bc(t)
+1 , . . . ,bc(t)
+K )⊤.
+Métrica funcional y centrado:
+SeaG∈R K×K la matriz de Gram de la base producto,
+Gkl =
+ZZ
+∆×T
+Ψk(δ, τ) Ψl(δ, τ)dδ dτ, G=S ⊤S(descomposición de Cholesky).
+La media funcional estimada en coeficientes es
+¯c= 1
+n
+nX
+t=1
+bc(t), ˜c(t) = bc(t) − ¯c.
+El producto interno inducido porG cumple ⟨f, g⟩ =c ⊤
+f G cg y ∥f∥ 2 =c ⊤
+f G cf en el subespacio
+generado por la base.
+PCA en la métricaL2(∆×T):
+Existen dos formulaciones equivalentes (Ramsay & Silverman, 2006):
+Problema de autovalores generalizado: Sea la covarianza muestral en coeficientesΣ =
+1
+n
+Pn
+t=1 ˜c(t)˜c(t)⊤. Las componentes principales funcionales resuelven
+Σv k =λ k Gv k,v ⊤
+k Gv ℓ =⊮{k=ℓ},
+dando autovaloresλk (varianza explicada) y autovectoresvk que representan las auto-
+funcionesΦ k(δ, τ) =PK
+j=1 vk,j Ψj(δ, τ)normalizadas enL 2(∆×T).
+16
+
+===== PAGE 18 =====
+
+Transformación mediante Cholesky: Defina la transformación linealu(t) = S ˜c(t) y la
+matriz de covarianza transformadaΣu = 1
+n
+Pn
+t=1 u(t)u(t)⊤. La PCA euclidiana de{u(t)}
+produce autovectoresw k y autovaloresλk. Los autovectores en el espacio de coeficientes
+se recuperan como
+vk =S −1 wk,∥v k∥2
+G =v ⊤
+k Gv k = 1,
+y las autofuncionesΦk se obtienen como arriba.
+Ambas formulaciones son algebraicamente idénticas: la segunda reduce el problema gene-
+ralizado al caso euclídeo vía la métrica de Gram y suele ser más estable numéricamente con
+bases no ortonormales (Ramsay & Silverman, 2006).
+Puntajes funcionales y reconstrucción:
+Los puntajes principales del díatse calculan como proyecciones en la métricaG:
+ξ(t)
+k =⟨ ˜X(t),Φ k⟩= ˜c(t)⊤Gv k =u (t)⊤wk.
+La aproximación de rangoK0 de la superficie es
+bX(t)
+(K0)(δ, τ) = ¯X(δ, τ) +
+K0X
+k=1
+ξ(t)
+k Φk(δ, τ), ¯X(δ, τ) =
+KX
+j=1
+¯cj Ψj(δ, τ).
+El error de truncamiento en normaL2(∆×T)está acotado por P
+k>K0 λk.
+Algoritmo de estimación:
+Obtenerbc(t) por mínimos cuadrados en la base tensorial y centrar:˜c(t).
+ConstruirG=G τ ⊗G δ y su CholeskyG=S ⊤S.
+Formaru (t) = S ˜c(t) y aplicar PCA euclidiana a la matriz de datos transformados (filas
+= días, columnas =K).
+Mapear autovectores:v k =S −1wk y normalizar enG.
+Calcular puntajes:ξ (t)
+k =u (t)⊤wk; reconstruir conK0 componentes.
+Selección del número de componentesK0:
+Se consideran criterios complementarios (Ramsay & Silverman, 2006):
+Porcentaje de varianza explicada (FVE): elegir el menorK0 tal quePK0
+k=1 λk/PK
+k=1 λk ≥
+α(típicamenteα∈[0,95,0,99]).
+17
+
+===== PAGE 19 =====
+
+Criterio BIC penalizado sobreK0: BIC(K0) = nlog (RSSK0/n) +K0 logn, dondeRSSK0
+es la suma de errores de reconstrucción en normaL2.
+Pruebas de corte (bootstrap): contrastarH0 : λK0+1 = 0vía remuestreo de residuos en
+el espacio de coeficientes.
+Diagnósticos metodológicos:
+Para validar la base tensorial y la elección deKδ, Kτ antes de fijarK0:
+Error de reconstrucción y PRESS (Predicted Residual Sum of Squares) con matriz
+sombrero H = X(X ⊤X)−1X ⊤ en el ajuste por día; usarei/(1 −h ii)como aproximación
+leave-one-out.
+Leverageh ii por nodo de la malla; valores cercanos a 1 indican interpolación excesiva.
+Estructura de residuosV− bV por( δ, τ)para detectar rigidez en alas o vencimientos
+cortos.
+Estabilidad de subespacios: distancia de proyección entre las envolventes de{Φ1, Φ2, Φ3}
+al variar(K δ, Kτ)en submuestras temporales.
+Interpretación en SVI:
+En aplicaciones a superficies de volatilidad implícita, es habitual que las primeras com-
+ponentes se interpreten como: (i) nivel global de la superficie; (ii) inclinación o skew entre
+puts OTM y calls OTM; (iii) curvatura o efecto de alas. Esta estructura de factores ha sido
+documentada repetidamente en datos de índices y divisas (Cont & Da Fonseca, 2002; Fengler
+et al., 2003).
+3.6. Regresión kernel en puntajes FPCA con errores ARH(1)
+El punto de partida conceptual es el marco de regresión funcional dinámica con errores
+ARH(1) estudiado por Ruiz-Medina et al. (2019). En su formulación general, la respuesta
+funcionalY t ∈H(conHun espacio de Hilbert real separable) se modela como
+Yt =µ t +ε t, ε t+1 =ρ H(εt) +δ t+1,
+donde µt representa la media condicional (potencialmente dependiente de información previa
+y/o regresores funcionales),ρH : H→H es un operador lineal de autocorrelación y{δt} es
+ruido blanco enH(media cero, sin correlación serial).
+18
+
+===== PAGE 20 =====
+
+En esta tesis, el objeto observado en cada fecha es una superficie diariaYt(δ, τ) ∈L 2(∆×T ).
+Las Secciones 3.2–3.5 establecen una representación funcional estable y una reducción de
+dimensión mediante FPCA con métrica correcta. El resultado operativo de ese bloque es:
+un vector depuntajesFPCA truncados
+Zt = (ξt,1, . . . , ξt,K0)⊤ ∈R K0,(1)
+que resume la superficie diaria enK0 coordenadas ortogonales respecto de la métrica
+funcional;
+un operador de reconstrucción (definido en 3.5) que mapea puntajes a una superficie en
+la malla de evaluación,
+z7− →by(z)∈R n,(2)
+de modo que la predicción de superficies se reduce a la predicción de puntajes seguida
+de reconstrucción.
+Bajo esta parametrización, el modelo dinámico se plantea directamente en el espacio
+reducido RK0, preservando la idea central del enfoque ARH(1): una estructura explícita de
+dependencia temporal en el componente residual.
+Descomposición dinámica en media condicional y residuo
+La dinámica de los puntajes se expresa mediante una descomposición en un componente
+sistemático y un residuo:
+Zt+1 =m(Z t) +e t+1.(3)
+Aquím:R K0 →R K0 representa la media condicional deZt+1 dadoZ t. Es decir,
+m(z) =E[Z t+1 |Z t =z].
+El términoe t+1 corresponde al residuo no explicado por esa media condicional:
+et+1 =Z t+1 −m(Z t).
+Por construcción, el residuo tiene media cero condicional aZt, esto es,E[et+1 |Z t] = 0.
+Incluso si m(·)captura relaciones no lineales relevantes, en series financieras es habitual
+que persista memoria temporal en los residuos. Para modelar esa persistencia, se adopta una
+estructura ARH(1) en dimensión finita:
+et+1 =ρ e t +u t+1, E[u t+1 | F t] = 0,(4)
+19
+
+===== PAGE 21 =====
+
+donde ρ∈R K0×K0 y {ut} es ruido blanco vectorial (media cero y sin correlación serial). Una
+condición suficiente de estabilidad es que el radio espectral cumpla con
+r(ρ)<1 (equivalentemente,m´ ax
+j
+|λj(ρ)|<1),(5)
+lo que garantiza una dinámica residual estable.
+Estimación no paramétrica de la media condicional
+La media condicionalm(·)se estima mediante un suavizador por núcleo del tipo Nadaraya–
+Watson. Dada una muestra de puntajes{Z1, . . . , ZT }, para un instantet (con2 ≤t≤T− 1)
+se utiliza el conjunto de pares disponibles{(Zi, Zi+1)}t−1
+i=1 y se define
+bmt(z) =
+Pt−1
+i=1 wi(z)Z i+1
+Pt−1
+i=1 wi(z)
+, w i(z) =K
+ d(z, Zi)
+h
+
+,(6)
+donde:
+K(·)esunnúcleoradialnonegativo(porejemplo,elnúcleogaussiano K(u) = exp(−u2/2));
+h >0es el ancho de banda;
+d(·,·)es una distancia enR K0.
+Distancia estandarizada.Como los componentes de Zt pueden presentar escalas distintas,
+la distancia se evalúa en coordenadas estandarizadas:
+d(z, z′) =
+D−1(z−z ′)
+
+2 , D= diag(s 1, . . . , sK0),(7)
+donde sℓ es la desviación estándar muestral del componenteℓ. Este escalamiento evita que
+uno o pocos puntajes dominen los pesos del núcleo.
+Residuos y estimación del operador ARH(1)
+Una vez estimada la media condicional, los residuos empíricos se obtienen como
+bet+1 =Z t+1 −bmt(Zt),(8)
+para los instantes donde la estimación esté bien definida (típicamentet= 1, . . . , T−1).
+El operador ρ se estima mediante un análogo vectorial de las ecuaciones de Yule-Walker o,
+equivalentemente, por mínimos cuadrados, con regularización tipo ridge para estabilizar la
+20
+
+===== PAGE 22 =====
+
+inversión. SeaT ′ = T− 2el número de pares consecutivos disponibles para el ajuste AR(1) en
+residuos. Se definen
+bC0 = 1
+T ′
+T ′
+X
+t=1
+betbe⊤
+t , bC1 = 1
+T ′
+T ′
+X
+t=1
+bet+1be⊤
+t ,(9)
+y el estimador regularizado
+bρ=bC1
+ bC0 +λ ρIK0
+−1, λ ρ >0.(10)
+La penalización λρ reduce inestabilidades numéricas cuandoK0 no es pequeño o cuandobC0 es
+mal condicionada.
+Predicción de puntajes y reconstrucción de superficies
+Predicción a un horizonte de un período.La predicción condicional de los puntajes
+(un período adelante) se define como el valor esperado condicional bajo el modelo (3)–(4):
+bZt+1|t =bmt(Zt) +bρbet,be t =Z t −bmt−1(Zt−1),(11)
+parat≥2.
+Luego, la predicción de la superficie en malla se obtiene aplicando el operador de recons-
+trucción (14):
+byt+1|t =by
+ bZt+1|t
+
+∈R n.(12)
+Predicción a horizonteh > 1.Para un horizonte h > 1, la iteración se realiza propagando
+el estado predicho y la componente residual según su esperanza condicional. En particular, se
+utiliza la recursión
+bet+1|t =bρbet,
+bet+k|t =bρbet+k−1|t =bρkbet, k= 2, . . . , h,
+y se define
+bZt+k|t =bmt
+ bZt+k−1|t
+
++bet+k|t, k= 1, . . . , h.
+La predicción de la superficie al horizontehresulta de
+byt+h|t =by
+ bZt+h|t
+
+.
+Este esquema es consistente con la estructura AR(1) adoptada para los residuos y permite
+generar trayectorias predichas en el espacio reducido.
+21
+
+===== PAGE 23 =====
+
+5. Enlace con ARH(1) funcional tras truncación FPCA
+El uso de un residuo con dependencia ARH(1) enRK0 se justifica como una operacionaliza-
+ción de la idea funcional de Ruiz-Medina et al. (2019). Siεt ∈H satisface εt+1 = ρH(εt) +δt+1
+y PK0 es el proyector ortogonal sobre el subespacio generado por las primerasK0 autofunciones
+FPCA (ortonormales en la métrica correcta), entonces el residuo proyectadoPK0εt pertenece
+a un subespacio de dimensión finita. Bajo una aproximación de truncación del operador
+ρH ≈P K0ρH PK0,
+la dinámica proyectada se aproxima por un AR(1) vectorial en coordenadas de puntajes, lo
+que conduce al modelo(4). En consecuencia, el términobρbet de (11) preserva la interpretación
+dememoria residualpropia del marco ARH(1), pero en un espacio reducido y numéricamente
+estable.
+En síntesis, el procedimiento integra tres piezas coherentes entre sí: (i) FPCA con métrica
+funcional correcta (estado reducidoZt), (ii) estimación no paramétrica de la media condicional
+por suavización con núcleo (bmt), y (iii) dependencia temporal explícita en residuos mediante
+ARH(1) truncado (bρ). Esta combinación define el modelo principal evaluado empíricamente
+en la Sección 5.
+3.7. Modelos de referencia
+El modelo propuesto en la sección anterior se compara con un conjunto de modelos de
+referencia que cubren, de forma escalonada, cuatro ideas básicas en este problema:
+Persistencia en la malla observada(referencia mínima).
+Persistencia del componente ajustado(separa ruido de medición vs dinámica).
+Modelos lineales en el espacio de puntajes(dinámica lineal multivariante).
+Dependencia ARH(1) en puntajes sin regresión por núcleo(aísla el efecto del
+núcleo).
+En todos los casos, el objetivo es pronosticar la superficie futuraYt+h en la malla(δr, τs)
+y medir el error fuera de muestra. Seayt ∈R n el vector de observaciones en la malla en la
+fecha t, con n = nδnτ. Seabct ∈R p el vector de coeficientes de la base tensorial estimado en
+las Secciones 3.3–3.4. La superficieajustada por basequeda representada por
+byaj
+t =Xbct ∈R n.(13)
+22
+
+===== PAGE 24 =====
+
+Asimismo, sea Zt ∈R K0 el vector de puntajes FPCA (Sección 3.5) y seaby(·)el operador de
+reconstrucción que transforma puntajes en superficies en la malla (Sección 3.5),
+by(z) =X
+
+¯c+S−⊤Az
+
+∈R n.(14)
+3.7.1. Persistencia en la malla observada (PM)
+El modelo más simple asume que la superficie observada no cambia:
+byPM
+t+h|t =y t, h≥1.(15)
+Esta referencia es deliberadamente elemental, pero indispensable en series con alta persistencia
+a horizontes cortos.
+3.7.2. Persistencia de la superficie ajustada (PA)
+Como yt puede contener ruido de medición, valores faltantes e irregularidades de malla, se
+utiliza una segunda referencia que persiste la superficie ajustada por base:
+byPA
+t+h|t =byaj
+t =Xbct, h≥1.(16)
+Este modelo separa la contribución deestabilizar la representación funcionalde la contribución
+demodelar dinámica temporal.
+3.7.3. Autorregresivo vectorial de orden 1 en puntajes (VAR(1))
+Al proyectar las superficies al espacio reducidoZt ∈R K0, la dinámica se aproxima mediante
+un modelo lineal multivariante:
+Zt+1 =a+BZ t +η t+1, E[η t+1] = 0,Cov(η t+1) = Ση,(17)
+donde a∈R K0 y B∈R K0×K0. La estimación se realiza por mínimos cuadrados con regulari-
+zación cuadrática:
+(ba,bB) = arg m´ ın
+a,B
+X
+t
+∥Zt+1 −a−BZ t∥2
+2 +λ var∥B∥2
+F , λ var >0.
+Pronóstico para el horizonteh.El pronóstico iterado se obtiene aplicando recursivamente
+(17):
+bZV AR
+t+h|t =ba+bB bZV AR
+t+h−1|t, bZV AR
+t|t =Z t.
+La superficie pronosticada se reconstruye por
+byV AR
+t+h|t =by
+
+bZV AR
+t+h|t
+
+.(18)
+23
+
+===== PAGE 25 =====
+
+Este modelo captura dependencia temporallinealy correlación cruzada entre componentes de
+Zt, pero no modela no linealidad.
+3.7.4. ARH(1) en incrementos de puntajes (ARH-inc)
+Para aislar el valor añadido de la regresión por núcleo, se considera una dinámica con
+persistencia del estado como componente sistemática (equivalentementeE[Zt+1 |Z t] = Zt) y
+se modela únicamente la dependencia temporal en los incrementos. Se define
+∆Zt =Z t −Z t−1.(19)
+Se supone que{∆Zt}satisface una dinámica ARH(1) finito-dimensional:
+∆Zt+1 =ρ∆Z t +u t+1, u t ruido blanco enRK0.(20)
+La estimación deρse obtiene mediante un análogo regularizado de Yule–Walker:
+bρ=bC1(bC0 +λ ρI) −1, λ ρ >0,
+donde
+bC0 = 1
+T ′
+X
+t
+∆Zt ∆Z⊤
+t , bC1 = 1
+T ′
+X
+t
+∆Zt+1 ∆Z⊤
+t .
+Pronóstico para el horizonteh.De (20) se obtiene E[∆Zt+k | ∆Zt] = bρk∆Zt. Como
+Zt+h =Z t +Ph
+k=1 ∆Zt+k, el pronóstico queda:
+bZARH-inc
+t+h|t =Z t +
+hX
+k=1
+bρk∆Zt, h≥1.(21)
+La superficie pronosticada se reconstruye como
+byARH-inc
+t+h|t =by
+
+bZARH-inc
+t+h|t
+
+.(22)
+Este modelo incorpora memoria temporal en los incrementos, pero no incluye una media
+condicional no lineal. Si el modelokernel+ARH(1)supera aARH-inc, la mejora se atribuye
+principalmente a la capacidad de capturar no linealidad enE[Zt+1 |Z t].
+3.7.5. Resumen de modelos y comparabilidad
+En síntesis, los modelos evaluados en la Sección 5 son:
+PM(persistencia en malla): (15).
+24
+
+===== PAGE 26 =====
+
+PA(persistencia ajustada): (16).
+VAR(VAR(1) en puntajes): (17)–(18).
+ARH-inc(ARH(1) en incrementos): (20)–(22).
+Kernel+ARH(1)(modelo principal): Sección 3.6.
+Todos los modelos que operan enRK0 se conectan con el espacio de superficies a través
+del mismo operador de reconstrucción(14). Por tanto, las diferencias entre modelos provienen
+exclusivamente de la forma de pronosticarZt+h.
+Métrica de evaluación
+El desempeño se evalúa mediante el error cuadrático medio en la malla:
+RMSE(t, h) =
+vuut 1
+n
+nX
+q=1
+ 
+byt+h|t,q −y t+h,q
+2.(23)
+4. Aplicación: Componentes Principales Funcionales de las SVI
+4.1. Descripción de los Datos
+Fuente y periodo:
+Las superficies se obtienen de Bloomberg mediante la funciónVOLC para divisas. A partir
+del 04 de febrero de 2025, Bloomberg publica mallas diarias completas y regulares en delta
+y vencimiento para los pares de divisas de interés, principalmente USD/PEN (Dólar vs. Sol
+Peruano). Para asegurar máxima homogeneidad y ausencia de valores faltantes, se trabaja
+con las últimas 128 jornadas hábiles del periodo disponible, hasta el 31 de julio de 2025.
+Construcción de la superficie:
+Por cada día, se poseen las cotizaciones estándarATM(at-the-money),risk reversal(RR) y
+butterfly(BF) en los niveles de delta 10 y 25. SeaσATM la volatilidad at-the-money, yσxC, σxP
+las volatilidades de call/put con deltax∈ {10,25}. Se utilizan las identidades habituales:
+RRx =σ xC −σ xP,BF x = σxC +σ xP
+2 −σ ATM.
+Resolviendo las ecuaciones, se recuperan las volatilidades de puts y calls:
+σxC =σ ATM +BF x + 1
+2RRx, σ xP =σ ATM +BF x − 1
+2RRx.
+25
+
+===== PAGE 27 =====
+
+Con esto, para cada día, se construye la superficie completa en cinco niveles de moneyness/delta:
+{25P,10P,ATM,10C,25C}.
+Vencimientos:
+Se emplean 13 vencimientos estándar por día
+{1W,2W,1M,2M,3M,6M,9M,1Y,18M,2Y,3Y,4Y,5Y}.
+Donde W significa semana (1W = 1 semana), M significa mes (1M = 1 mes) y Y significa
+año (1Y = 1 año)
+La combinación de 5 niveles de delta y 13 tenores define una malla5×13sin datos faltantes
+para cada fecha del panel.
+Pares de divisas:
+Se usa la notación BASE/CONTRA. Por ejemplo, en USD/PEN, la volatilidad implícita
+corresponde a opciones cuyo subyacente es el tipo de cambio del dólar estadounidense por sol
+peruano. Las divisas analizadas son:
+USD/PEN: dólar estadounidense / sol peruano (Perú)
+USD/COP: dólar estadounidense / peso colombiano (Colombia)
+USD/CLP: dólar estadounidense / peso chileno (Chile)
+USD/BRL: dólar estadounidense / real brasileño (Brasil)
+USD/ARS: dólar estadounidense / peso argentino (Argentina)
+USD/MXN: dólar estadounidense / peso mexicano (México)
+EUR/USD: euro / dólar estadounidense (referencia de mercado desarrollado)
+USD/ZAR: dólar estadounidense / rand sudafricano (referencia de mercado emergente
+fuera de Latinoamérica)
+En todos los casos, las superficies de volatilidad se construyen sobre la misma rejilla de 5
+niveles de delta (put 25%, put 10%, ATM, call 10%, call 25%) por 13 vencimientos, lo que
+facilita la comparación entre pares de divisas.
+El conjunto de datos resultante es un panel diario donde, para cada par de divisas y cada
+fecha t, se observa una superficie de volatilidad implícita en una malla fija(δ, τ)de dimensión
+5 × 13. Esta regularidad permite la proyección directa en la base B–spline tensorial y la
+aplicación de FPCA sobre superficies bidimensionales.
+26
+
+===== PAGE 28 =====
+
+4.2. Preprocesamiento y conformación del panel
+Estructura de datos:
+Cada día t y cada parM generan una matriz5 × 13de volatilidades σ(δ, τ)en la rejilla de
+cinco deltas {25P,10P,ATM,10C,25C} por trece tenores. El panel se transforma a formato
+largo con campos moneda,fecha, δ, τ, σ}.
+Conversión de tenores:
+Se mapeaτ7→t(años) para unificar la escala temporal:
+t(1W) = 1
+52 , t(1M) = 1
+12 , t(1Y) = 1,etc.
+Convención de orden:
+Se fija el orden de deltas25P,10P,ATM,10C,25C y el orden creciente de tenores, de modo
+que el vectorizado sea reproducible. Para ilustrar la malla y la estabilidad de la rejilla en el
+par USD/PEN, véase la Fig. 1.
+25P 10P ATM 10C 25C
+0 1 2 3 4 5 0 1 2 3 4 5 0 1 2 3 4 5 0 1 2 3 4 5 0 1 2 3 4 5
+8
+10
+12
+7.5
+10.0
+12.5
+15.0
+6
+7
+8
+9
+10
+6
+7
+8
+9
+6
+7
+8
+9
+Tenor (años)
+Volatilidad (%)
+Curvas de volatilidad por delta – USDPEN
+Figura 1: Curvasτ7→σ (δ, τ)por fecha para USD/PEN y por cada delta. Cada línea gris
+corresponde a un día; la línea azul muestra la tendencia promedio por delta.
+4.3. Ajuste diario sobre base B-spline tensorial
+Cada superficie diaria de volatilidadσ(t)(δ, τ)se aproxima en un espacio finito generado
+por el producto tensorial de dos bases B-spline cúbicas, una por eje.
+Bases unidimensionales:
+SeaΦ δ ∈R 5×Kδ la matriz de evaluación de la base B-spline en el eje deδ (cinco niveles) y
+Φτ ∈R 13×Kτ la correspondiente al eje deτ (trece tenores). Los grados de libertadKδ y Kτ se
+fijarán mediante diagnósticos formales en la sección de validación.
+27
+
+===== PAGE 29 =====
+
+Diseño de Kronecker:
+La base bidimensional se construye como producto tensorial. Siy(t) = vecσ (t) ∈R 65 es la
+vectorización columna-a-columna de la malla (ordenandoτ de menor a mayor dentro de cada
+nivel deδ), entonces el diseño es
+X= Φ τ ⊗Φ δ ∈R 65×K, K=K δKτ .
+Estimación de coeficientes:
+Para cada díat, los coeficientesbc(t) ∈R K se obtienen por mínimos cuadrados ordinarios,
+bc(t) = (X ⊤X) −1X ⊤y(t),
+y la superficie ajustada se recupera comoby(t) = Xbc(t), que reacomodada a formato5× 13
+entregabσ(t)(δ, τ).
+Métrica funcional:
+Para respetar el producto internoL2(∆ ×T )en etapas posteriores, se utiliza la métrica
+inducida por las matrices de Gram unidimensionales,
+Gδ =
+Z
+BδB⊤
+δ , G τ =
+Z
+Bτ B⊤
+τ , G=G τ ⊗G δ,
+cuyo factor de CholeskyG=S ⊤Sse empleará en la FPCA sobre coeficientes.
+A modo ilustrativo, la Figura 2 muestra el ajustebσ(δ, τ)obtenido para un día seleccionado
+al azar en USD/PEN; los contornos representan niveles de volatilidad (en%) y se reporta el
+RMSE diario calculado sobre la rejilla5×13.
+28
+
+===== PAGE 30 =====
+
+−25%
+−10%
+ATM
++10%
++25%
+1W 3M 6M 1Y 2Y 3Y 5Y
+Tenor
+Delta
+Vol (%)
+(5.71, 7.14]
+(7.14, 8.57]
+(8.57, 10.00]
+(10.00, 11.43]
+(11.43, 12.86]
+(12.86, 14.29]
+(14.29, 15.71]
+(15.71, 17.14]
+RMSE = 0.718 pp
+Superficie ajustada – USDPEN (2025−04−24)
+Figura 2: Superficie de volatilidad implícita ajustadabσ(δ, τ)para USD/PEN en un día al azar.
+Los colores indican niveles de volatilidad (%), con curvas de nivel sobre la rejilla de cinco
+deltas( −25 %,− 10 %,ATM, +10 %, +25 %)y trece tenores (de 1W a 5Y). El valor RMSE
+mostrado corresponde al error cuadrático medio del ajuste en ese día, calculado sobre los
+5×13puntos de la rejilla.
+4.4. FPCA de superficies en la métrica funcional
+Centrado y transformación métrica:
+Seabc(t) ∈R K el vector de coeficientes (base B-spline tensorial) que representa la SVI del
+díat. Se centra por columna,
+˜c(t) =bc(t) − ¯c, ¯c= 1
+T
+X
+t
+bc(t).
+Para respetar el producto internoL2(∆ ×T )inducido por la base no ortonormal, se usa
+la métrica G = Gτ ⊗G δ, con descomposición de CholeskyG = S⊤S. La representación en
+coordenadas euclidianas es
+u(t) =S ˜c(t) ∈R K.
+PCA euclidiana y mapeo inverso:
+Se aplica PCA a la matriz con filas{u(t)}t. Siw k es el k-ésimo autovector euclidiano
+(normalizado), el autovector en el espacio de coeficientes es
+vk =S −1wk,∥v k∥2
+G =v ⊤
+k Gv k = 1,
+29
+
+===== PAGE 31 =====
+
+y los puntajes diarios se obtienen comoξ(t)
+k =u (t)⊤wk.
+Reconstrucción y visualización:
+Dada la base bidimensionalX = Φτ ⊗ Φδ, la k-ésima eigen-superficie esφk(δ, τ) = X vk.
+ConK 0 componentes,
+bσ(t)
+K0(δ, τ) =bµ(δ, τ) +
+K0X
+k=1
+ξ(t)
+k φk(δ, τ),bµ(δ, τ) =X ¯c.
+Componentes Principales:
+Los resultados de la descomposición se muestran en la siguiente tabla:
+Par PC1 PC2 PC3 PC4 PC5
+USD/PEN 0.8713 0.1216 0.0044 0.0026 0.0001
+USD/COP 0.9264 0.0653 0.0075 0.0005 0.0002
+USD/CLP 0.8378 0.1601 0.0014 0.0006 0.0000
+USD/BRL 0.8476 0.1499 0.0020 0.0003 0.0001
+USD/ARS 0.7992 0.1949 0.0038 0.0017 0.0003
+USD/MXN 0.9426 0.0543 0.0027 0.0002 0.0001
+EUR/USD 0.9613 0.0322 0.0060 0.0004 0.0001
+USD/ZAR 0.9667 0.0322 0.0006 0.0005 0.0000
+Cuadro 1: Proporción de varianza explicada (FVE) por componente principal y par de divisas.
+En todos los pares, PC1 domina (80–97%): un factor de nivel que desplaza la superficie
+casi paralelamente (más intensa cerca de ATM y persistente a lo largo de los vencimientos).
+PC2 aporta entre 3–20% según el par y suele corresponder a inclinación/tilt(movimientos
+diferenciales entre puts OTM y calls OTM y/o un sesgo por vencimiento). PC3 es residual
+(en general < 1%), asociado a curvatura/alas de la superficie. En consecuencia, reconstruc-
+ciones con K0 = 2capturan casi toda la variabilidad, yK0 = 3refina el ajuste de alas sin
+sobreparametrizar.
+Las diferencias entre las varianzas explicadas de los PC1 y PC2 entre pares de divisas
+tienen una interpretación económica:
+EUR/USD y USD/ZAR (PC1 ≈ 96-97%): Mercados desarrollados (EUR/USD) o
+emergentes pero líquidos (USD/ZAR) exhiben una dinámica dominada por shocks de
+nivel de volatilidad; cambios globales en incertidumbre macro y política monetaria
+internacional, con menor participación de skew/curvatura. La microestructura (spreads
+30
+
+===== PAGE 32 =====
+
+estrechos, profundidad) y el∆-hedging frecuente estabilizan la forma relativa de la SVI;
+por eso PC2 y PC3 pesan poco.
+USD/MXN y USD/COP (PC1 93-95%): Pares líquidos de Latinoamérica; el nivel explica
+casi toda la variación. La menor PC2 sugiere que las variaciones deskewson acotadas;
+efectos decarry, flujos corporativos estacionales y un régimen cambiario de flotación
+limpia aparecen principalmente vía nivel (PC1).
+USD/PEN, USD/CLP, USD/BRL (PC1 84–87%, PC2 12–16%): Aquí PC2 es más
+relevante. Algunas posibles causas son intervenciones discrecionales (manejo de bandas
+implícitas), sensibilidad de las colas a shocks de términos de intercambio (commodities
+en CLP y BRL) y profundidad desigual por cada vencimiento. El resultado es untilt
+más activo (asimetría put-call y/o term-tilt), que eleva la varianza explicada por la PC2.
+USD/ARS (PC1 80%, PC2 19.5%): El peso de PC2 apunta a episodios de reconfiguración
+deskewy desalineamientos por vencimiento, consistentes con controles de capital, un
+régimen cambiario discrecional y saltos de régimen (ej. devaluaciones).
+Estabilidad subespacial:
+Para evaluar estabilidad de las direcciones principales, se compara el subespacio generado
+por PC1-PC3 en toda la muestra con el de una submuestra reciente deW = 50días, usando
+la distancia de proyecciones (norma de Frobenius). Para USD/PEN se obtienedist = 0,212, lo
+que sugiere buena estabilidad de las primeras tres PCs en la ventana reciente (valores cercanos
+a 0 indican subespacios muy similares).
+Eigensuperficies (bµ±1DE):
+Las Figuras 3–5 muestran las deformaciones de la superficie mediabµ(δ, τ)al moverse
+±1desviación estándar a lo largo de cada componente principal. Los ejes sonTenor (años)
+en el eje x yDeltaen el eje y; la escala de color indica variación de volatilidad en puntos
+porcentuales.
+En USD/PEN, (i) PC1 es un factor de nivel con sesgo deskew: el impacto es mayor en el
+ala put y en los tenores largos (4-5Y), consistente con su FVE dominante; (ii) PC2 genera un
+tilten las alas vs. ATM, más visible en el tramo largo; (iii) PC3 modula la curvatura local en
+torno a 2-3 años.
+31
+
+===== PAGE 33 =====
+
+1 2 3 4 5
+−0.3 −0.1 0.1 0.2 0.3
+PC 1 (+1 SD)
+Tenor (años)
+Delta
+−20
+0
+20
+40
+60
+1 2 3 4 5
+−0.3 −0.1 0.1 0.2 0.3
+PC 1 (−1 SD)
+Tenor (años)
+Delta
+−40
+−20
+0
+20
+40
+Figura 3: Eigensuperficie PC1 para USD/PEN:bµ±1DE.
+1 2 3 4 5
+−0.3 −0.1 0.1 0.2 0.3
+PC 2 (+1 SD)
+Tenor (años)
+Delta
+−10
+0
+10
+20
+1 2 3 4 5
+−0.3 −0.1 0.1 0.2 0.3
+PC 2 (−1 SD)
+Tenor (años)
+Delta
+0
+10
+20
+30
+40
+Figura 4: Eigensuperficie PC2 para USD/PEN:bµ±1DE.
+1 2 3 4 5
+−0.3 −0.1 0.1 0.2 0.3
+PC 3 (+1 SD)
+Tenor (años)
+Delta
+6
+8
+10
+12
+14
+16
+18
+1 2 3 4 5
+−0.3 −0.1 0.1 0.2 0.3
+PC 3 (−1 SD)
+Tenor (años)
+Delta
+6
+8
+10
+12
+14
+Figura 5: Eigensuperficie PC3 para USD/PEN:bµ±1DE.
+Perfiles por tenor a delta fijo:
+32
+
+===== PAGE 34 =====
+
+Las figura 6 muestraτ7→bσ (δ, τ)para cinco deltas en dos fechas (USD/PEN). Se observa
+suavidad por tenor y coherencia entre deltas; además, los patrones son consistentes con las
+eigensuperficies: PC1 desplaza casi en paralelo las curvas y PC2 se manifiesta como separación
+de las alas vs. ATM en el tramo de vencimientos largos.
+0 1 2 3 4 5
+6 8 10 12 14 16
+Perfiles por vencimiento a delta fijo – 2025−02−04
+Tenor (años)
+Vol (%)
+−25%
+−10%
+ATM
++10%
++25%
+0 1 2 3 4 5
+8 10 12 14 16
+Perfiles por vencimiento a delta fijo – 2025−07−31
+Tenor (años)
+Vol (%)
+−25%
+−10%
+ATM
++10%
++25%
+Figura 6: Perfiles por tenor a delta fijo (USD/PEN). Arriba: 2025-02-04; abajo: 2025-07-31.
+Las variaciones casi paralelas reflejan PC1; la separación de alas frente a ATM en el largo
+refleja PC2.
+5. Modelos dinámicos en puntajes FPCA con dependencia au-
+torregresiva
+Este capítulo evalúa empíricamente, para USD/PEN, (i) el piso de error asociado a la
+representación funcional (ajuste por base), y (ii) el desempeñofuera de muestra(out-of-sample,
+OOS) de los modelos dinámicos descritos en el Capítulo 3, en distintos horizontes de pronóstico.
+33
+
+===== PAGE 35 =====
+
+5.1. Diseño del backtest OOS y modelos comparados
+Ventana temporal y horizonte.Se utiliza la muestra diaria de USD/PEN descrita en el
+Capítulo 4 (malla5 × 13), con un esquema de pronóstico móvil que emplea un periodo inicial
+de entrenamiento de 80 días y evalúa horizontesh∈ {1,5,10}.
+Métrica.El error se mide sobre la malla fija mediante:
+RMSE(t, h) =
+vuut 1
+n
+nX
+q=1
+ 
+byt+h|t,q −y t+h,q
+2, n= 65.
+Se reporta la mediana deRMSE(t, h)en el tramo OOS, junto con distribuciones (diagramas
+de caja) y un indicador de robustez.
+Modelos.Se comparan:
+PM(persistencia en malla observada), Ec. (3.31).
+PA(persistencia de la superficie ajustada por base), Ec. (3.32).
+VAR(VAR(1) en puntajes), Ec. (3.33)–(3.34).
+ARH-inc(ARH(1) en incrementos de puntajes), Ec. (3.35)–(3.36).
+Kernel+ARH(1)(modelo principal), Sección 3.5.
+Antes de comparar dinámicas, es útil cuantificar el error asociado únicamente a la repre-
+sentación diaria por base tensorial. En USD/PEN, el ajuste interno en la malla es alto: la
+RMSE mediana del ajuste por base es 0.0073 pp. Este valor actúa como un piso aproximado
+impuesto por ruido de mercado y error de representación; en consecuencia, las diferencias
+entre modelos dinámicos deben interpretarse frente a un error OOS que es, en general, un
+orden de magnitud mayor.
+5.2. Elección deK 0
+En esta tesis,K0 cumple dos roles distintos:
+K(rep)
+0 : dimensión parareconstrucción/compresión(Capítulo 4).
+K(dyn)
+0 : dimensión parapredicción.
+Para dinámica,K0 se interpreta como un hiperparámetro de regularización: incluir componentes
+de baja señal (alta frecuencia) puede degradar el pronóstico OOS al introducir variación no
+34
+
+===== PAGE 36 =====
+
+predecible en los puntajes y dificultar la estimación (en especial en métodos basados en
+distancias).
+Selección empírica por horizonte.Con base en la curva de sensibilidad (Fig. 7), se
+elige:
+K(dyn)
+0 (5) = 5, K (dyn)
+0 (10) = 3,
+mientras que parah = 1se mantiene el benchmark PM como referencia dominante, y los
+modelos dinámicos no muestran mejoras robustas.
+1 5 10
+5 10 15 20 5 10 15 20 5 10 15 20
+0.30
+0.35
+0.40
+0.20
+0.22
+0.24
+0.26
+0.10
+0.12
+0.14
+0.16
+0.18
+K0 (dimensión scores)
+RMSE mediana (pp)
+Modelo
+ARHinc
+KernelARH
+VAR1
+RMSE mediana vs dimensión dinámica K0 (USDPEN)
+Figura 7: Sensibilidad OOS: mediana de RMSE vsK0 para USD/PEN enh∈ { 1, 5, 10}. La
+selección dinámica privilegia compresión fuerte:K0 ∈ {3,5}según horizonte.
+5.3. Resultados principales OOS
+Esta sección reporta los resultados OOS centrándose en las configuraciones relevantes para
+pronóstico. La Tabla 2 resume la RMSE mediana por horizonte. Enh = 5se reportan modelos
+enK 0 = 5; enh= 10, enK 0 = 3.
+Cuadro 2: USD/PEN: RMSE mediana OOS por horizonte usandoK(dyn)
+0 (puntajes truncados).
+Modeloh= 1(K 0 = 10)h= 5(K 0 = 5)h= 10(K 0 = 3)
+PM (persistencia)0.07840.220 0.361
+PA (persistencia ajust.) 0.0787 0.220 0.361
+VAR1 (VAR(1) ridge) 0.110 0.230 0.324
+ARH-inc (incrementos) 0.08870.201 0.270
+KernelARH 0.161 0.263 0.281
+35
+
+===== PAGE 37 =====
+
+Horizonte h = 1: A un día, la SVI es altamente persistente: PM y PA constituyen un
+benchmark difícil de superar. En este horizonte, el costo de estimar dinámica (y el riesgo
+de sobreajuste) domina cualquier ganancia marginal. De hecho, aun bajoK0 ≤ 10, los
+modelos dinámicos empeoran la mediana: ARH-inc alcanza 0.0887 y VAR1 0.110 (vs.
+0.0784 de PM), por lo que el resultado operativo es utilizar persistencia.
+Horizonte h = 5: Con compresión moderada (K0 = 5), aparece señal dinámica explotable.
+En particular, ARH-inc reduce la RMSE mediana de 0.220 (PM) a0.201, una mejora
+relativa de aproximadamente1 − 0,201/0,220 ≈ 8,6 %. Este patrón sugiere que, a 5
+días, parte de la dinámica de los factores es predecible si se filtra adecuadamente la alta
+frecuencia.
+Horizonte h = 10: La ganancia más marcada ocurre a 10 días bajo compresión fuerte.
+ARH-inc con K0 = 3reduce la RMSE mediana desde 0.361 (PM) a0.270(mejora
+≈ 25,2 %). El modelo Kernel+ARH(1) también mejora conK0 = 3(RMSE mediana
+0.281; mejora ≈ 22,2 %), aunque su robustez (ver tasa de aciertos) es menor que la de
+ARH-inc en esta muestra. VAR1 también mejora en mediana ah = 10(0.324), pero su
+desempeño es más sensible (ver distribución/episodios de error).
+5.4. Robustez: distribución de errores y tasa de aciertos
+Distribuciones.Para complementar la mediana, las Figuras 8–9 reportan (i) series
+temporales de RMSE OOS y (ii) diagramas de caja por modelo, respectivamente. En particular,
+el modelo VAR tiende a exhibir episodios de error elevado (picos) en horizontes mayores,
+consistente con sensibilidad a estimación en muestras cortas y/o a cambios de régimen (aun
+cuando su mediana pueda ser competitiva enh= 10).
+36
+
+===== PAGE 38 =====
+
+10
+5
+1
+Jun 01 Jun 15 Jul 01 Jul 15 Aug 01
+0.0
+0.1
+0.2
+0.3
+0.4
+0.5
+0.2
+0.4
+0.6
+0.8
+0.5
+1.0
+Fecha objetivo
+RMSE (pp)
+Modelo ARHinc KernelARH PA PM VAR1
+Evolución RMSE OOS por horizonte (USDPEN)
+Figura 8: USD/PEN: series temporales de RMSE OOS por horizonte y modelo (configuración
+principal conK (dyn)
+0 ).
+1 5 10
+ARHinc
+KernelARH
+PA PM VAR1 ARHinc
+KernelARH
+PA PM VAR1 ARHinc
+KernelARH
+PA PM VAR1
+0.5
+1.0
+0.2
+0.4
+0.6
+0.8
+0.0
+0.1
+0.2
+0.3
+0.4
+0.5RMSE (pp)
+Backtest OOS RMSE (USDPEN)
+Figura 9: USD/PEN: diagráma de cajas de RMSE OOS por horizonte y modelo (configuración
+principal conK (dyn)
+0 ).
+Tasa de Aciertos:Se define como:
+TA(h) = 1
+|TOOS|
+X
+t∈TOOS
+⊮
+n
+RMSEmodelo(t, h)<RMSE PM(t, h)
+o
+.
+37
+
+===== PAGE 39 =====
+
+En USD/PEN, la tasa de aciertos confirma que las mejoras a horizontes medianos/largos
+no provienen de pocos outliers, sino que son relativamente sistemáticas cuando se usa baja
+dimensión. En particular:
+Para h = 10, ARH-inc alcanza valores de hasta≈ 0,72(con K0 = 3) y ≈ 0,80(con
+K0 = 5).
+Parah= 5, ARH-inc sube hasta≈0,73(conK 0 = 5).
+Kernel+ARH(1) tiende a ubicarse alrededor de≈ 0,46–0,51en h = 10(menor robustez
+en comparación con ARH-inc).
+Los resultados OOS para USD/PEN apuntan a tres conclusiones empíricas:
+A 1 día domina la persistencia. PM y PA capturan casi toda la señal relevante; la
+dinámica estimada no mejora de forma robusta (incluso conK0 = 10).
+A horizontes medianos/largos, la baja dimensión manda. La compresión aK0 ∈ {3, 5}
+filtra alta frecuencia no predecible y permite capturar la dinámica macro de la superficie.
+Modelos simples generalizan mejor en esta muestra. ARH-inc obtiene las mejoras más
+consistentes en mediana y en tasa de aciertos; Kernel+ARH(1) puede mejorar ah = 10
+con K0 pequeño, pero es menos robusto. VAR1 puede ser competitivo en mediana a
+h= 10, aunque muestra mayor sensibilidad en la distribución de errores.
+Para USD/PEN, con la muestra y el diseño OOS evaluados:
+Pronósticoh= 1: usar PM o PA.
+Pronósticoh= 5: usar ARH-inc conK 0 = 5(mejora mediana≈8–9 %frente a PM).
+Pronóstico h = 10: usar ARH-inc conK0 = 3(mejora mediana ≈ 25 %frente a PM).
+Kernel+ARH(1) con K0 = 3es alternativa competitiva en mediana, aunque menos
+robusta por tasa de aciertos.
+6. Conclusiones
+Esta tesis abordó el problema de representar y pronosticar superficies de volatilidad
+implícita (SVI) en mercados latinoamericanos, donde la microestructura (liquidez limitada,
+dispersión de cotizaciones y cambios de régimen) dificulta la aplicación robusta de modelos
+paramétricos clásicos. La contribución central fue construir un marco funcional coherente,
+38
+
+===== PAGE 40 =====
+
+desde la representación hasta la predicción, que permite trabajar con superficies como objetos
+en un espacio L2(∆ ×T ), manteniendo control explícito sobre la métrica, la estabilidad
+numérica y la reducción de dimensión.
+El primer aporte metodológico es la representación funcional bidimensional de las SVI
+mediante bases B-spline tensoriales, que entrega una parametrización flexible con soporte local
+y permite estabilizar superficies diarias aun cuando el muestreo sea escaso o irregular en otros
+contextos. Más importante aún, esta representación se integró con una corrección métrica
+explícita basada en la matriz de Gram y su factorización de Cholesky, garantizando que la
+descomposición en componentes principales se realice en la geometría natural del problema
+(L2) y no en un espacio euclidiano arbitrario de coeficientes. En términos prácticos, este punto
+evita que la base no ortonormal distorsione la noción de variabilidad y las proyecciones, un
+detalle técnico que es a la vez esencial para la interpretación y para la predicción.
+El segundo aporte metodológico es operacional: al combinar (i) representación por base, (ii)
+FPCA en la métrica correcta y (iii) modelamiento temporal de puntajes, se obtiene un flujo
+que separa con claridad tres fuentes de error: error de medición/ajuste, error de truncación
+(compresión) y error de pronóstico dinámico. Esta separación es valiosa porque permite
+diagnosticar en qué tramo el modelo gana o pierde; es decir, si el límite práctico proviene del
+ajuste diario por base (ruido/representación), de la dimensión retenida (truncación) o de la
+capacidad predictiva del modelo temporal sobre los factores.
+En el bloque empírico, el hallazgo principal es que la predictibilidad de la SVI depende
+fuertemente del horizonte. Para USD/PEN, a un día (h = 1) domina la persistencia: los
+modelos PM/PA establecen un benchmark que no es superado de manera robusta. En cambio,
+a horizontes medianos y largos (h = 5y h = 10), la reducción de dimensión se vuelve
+determinante: al trabajar conK0 pequeño (compresión fuerte), el modelo dinámico es efectivo
+y se obtienen mejoras fuera de muestra. En particular, el modelo ARH-inc logra el desempeño
+más consistente en esta muestra (mejoras de magnitud relevante en mediana y con tasas
+de acierto elevadas), lo que sugiere que una parte importante de la dinámica predecible se
+concentra en la evolución de incrementos de los factores, más que en la forma funcional
+completa día a día.
+Un resultado igualmente informativo es que el modelo no paramétrico Kernel+ARH(1),
+aunque conceptualmente atractivo por permitir no linealidad en la media condicional, no
+dominó a los benchmarks lineales simples en este panel. En términos prácticos, esto es
+consistente con (i) el tamaño muestral relativamente corto para estimación local en dimensión
+K0, (ii) la sensibilidad del suavizador a la elección de ancho de banda y a la escala relativa
+de puntajes, y (iii) la presencia potencial de cambios de régimen, donde las observaciones
+cercanas en el espacio de puntajes pueden no ser informativos para el futuro inmediato. En
+39
+
+===== PAGE 41 =====
+
+síntesis: en este caso, la ganancia vino más de regularizar (a bajas dimensiones) y de modelar
+los errores de forma autorregresiva que de introducir no linealidad vía kernel.
+Desde el punto de vista aplicado, la tesis entrega una recomendación operativa clara
+para USD/PEN bajo el diseño evaluado: (i) parah = 1, utilizar persistencia (PM/PA); (ii)
+para h = 5, un modelo parsimonioso en puntajes con dependencia en incrementos (ARH-inc)
+con compresión moderada; y (iii) parah = 10, compresión fuerte y dinámica simple (ARH-
+inc) como primera opción, con Kernel+ARH(1) como alternativa competitiva en mediana
+pero menos robusta. Estas conclusiones no deben interpretarse como universales, sino como
+evidencia empírica concreta en un mercado emergente con malla fija y periodo limitado, donde
+los costos de estimación y el riesgo de sobreajuste son especialmente relevantes.
+6.1. Limitaciones
+Esta investigación presenta limitaciones que delimitan el alcance de las inferencias:
+Tamaño y ventana temporal: el panel considerado (128 días hábiles) restringe la estabi-
+lidad de estimaciones dinámicas, especialmente para métodos no paramétricos y para
+operadores ρ en dimensión moderada. Con el paso del tiempo, se tendrán paneles de
+datos más extensos.
+Enfoque en USD/PEN: aunque se documenta la estructura FPCA para múltiples pares,
+la evaluación dinámica se concentra en USD/PEN; por tanto, la evidencia de pronóstico
+no se generaliza automáticamente a otras divisas.
+Predictores endógenos: el pronóstico se realiza únicamente con información interna de la
+SVI. No se incorporan variables exógenas (spot, tasas, carry, commodities, eventos), que
+podrían ser determinantes a horizontes mayores.
+Restricciones de no-arbitraje: el enfoque se centra en precisión predictiva sobre malla
+fija; no impone explícitamente restricciones de convexidad/monotonía o no-arbitraje
+en toda la superficie, lo cual puede ser relevante para aplicaciones de valorización y
+determinación de precios.
+6.2. Líneas de investigación futura
+Los resultados abren rutas naturales de extensión:
+Panel más largo y validación multi-par: extender la muestra y evaluar sistemáticamente en
+USD/CLP, USD/BRL, USD/COP, etc., para identificar regularidades y heterogeneidad
+40
+
+===== PAGE 42 =====
+
+por microestructura.
+Modelos dinámicos con cambios de régimen: introducir dinámicas tipo cambio de régimen
+Markov o modelos con parámetros que varían en el tiempo para capturar episodios de
+intervención estatal, escenarios de estrés o shocks económicos.
+Predicción directa multi-horizonte: contrastar pronóstico iterado vs pronóstico directo
+(estimandoE[Z t+h |Z t]) para reducir acumulación de error ahgrande.
+Kernel adaptativo y selección de banda: emplear anchos de banda adaptativos (por
+densidad local) y criterios de selección OOS específicos por horizonte para mitigar la
+inestabilidad del suavizado.
+Variables exógenas y modelos híbridos: incluir información macro/de mercado (spot,
+diferencial de tasas, términos de intercambio) en modelos tipo VARX o regresión funcional
+con covariables.
+Restricciones de forma/no-arbitraje: integrar penalizaciones o proyecciones que impongan
+regularidad económica en la superficie completa.
+En conclusión, la tesis muestra que, en un mercado latinoamericano con mallas densas re-
+cientemente disponibles, un enfoque funcional con métrica correcta permite una representación
+estable y una interpretación parsimoniosa de factores latentes. En cuanto al modelamiento
+dinámico, la evidencia sugiere que la clave práctica es controlar complejidad (baja dimensión) y
+modelar memoria de forma simple y robusta, antes que introducir sofisticación no paramétrica
+en muestras cortas. Esto proporciona un marco reproducible tanto para investigación futura
+como para aplicaciones en mesas de derivados orientadas a pronóstico y gestión de riesgo.
+41
+
+===== PAGE 43 =====
+
+Referencias
+Aue, A., Norinho, D. D., & Hörmann, S. (2015). On the Prediction of Stationary Functional
+Time Series.Journal of the American Statistical Association,110(509), 378-392. https:
+//doi.org/10.1080/01621459.2014.909317
+Avellaneda, M., Healy, B., Papanicolaou, A., & Papanicolaou, G. (2020, enero). PCA for
+Implied Volatility Surfaces [arXiv:2002.00085 [q-fin]]. https://doi.org/10.48550/arXiv.
+2002.00085
+Bosq, D. (2000).Linear Processes in Function Spaces(P. Bickel, P. Diggle, S. Fienberg, K.
+Krickeberg, I. Olkin, N. Wermuth & S. Zeger, Eds.; Vol. 149). Springer New York.
+https://doi.org/10.1007/978-1-4612-1154-9
+Bosq, D., & Blanke, D. (2007, octubre).Inference and Prediction in Large Dimensions(1.a ed.).
+Wiley. https://doi.org/10.1002/9780470724033
+Cont, R., & Da Fonseca, J. (2002). Dynamics of Implied Volatility Surfaces.Quantitative
+Finance,2(1), 45-60. https://doi.org/10.1088/1469-7688/2/1/304
+de Boor, C. (2001).A Practical Guide to Splines(Revised, Vol. 27). Springer. https://doi.org/
+10.1137/1022106
+Eilers, P. H. C., & Marx, B. D. (2003). Multivariate calibration with temperature interac-
+tion using two-dimensional penalized signal regression.Chemometrics and Intelligent
+Laboratory Systems,66(2), 159-174. https://doi.org/10.1016/S0169-7439(03)00029-7
+Fahrmeir, L., & Tutz, G. (2001).Multivariate Statistical Modelling Based on Generalized
+Linear Models(2. a ed.). Springer. https://doi.org/10.1007/978-1-4757-3454-6
+Fengler, M. R., Härdle, W. K., & Villa, C. (2003). The Dynamics of Implied Volatilities:
+A Common Principal Components Approach.Review of Derivatives Research,6(3),
+179-202. https://doi.org/10.1023/B:REDR.0000004823.77464.2d
+Ferraty, F., & Vieu, P. (2006).Nonparametric Functional Data Analysis: Theory and Practice.
+Springer.
+Grith, M., Wagner, H., Härdle, W. K., & Kneip, A. (2018). Functional Principal Component
+Analysis for Derivatives of Multivariate Curves.Statistica Sinica. https://doi.org/10.
+5705/ss.202017.0199
+Hagan, P., Kumar, D., Lesniewski, A., & Woodward, D. (2002). Managing Smile Risk.Wilmott
+Magazine,1, 84 -108. Consultado el 12 de junio de 2025, desde https://www.next-
+finance.net/IMG/pdf/pdf_SABR.pdf
+Heston, S. L. (1993). A Closed-Form Solution for Options with Stochastic Volatility with
+Applications to Bond and Currency Options.Review of Financial Studies,6(2), 327-343.
+https://doi.org/10.1093/rfs/6.2.327
+Jaimungal, S., & Ng, E. K. H. (2007). Consistent Functional PCA for Financial Time-Series.
+Proceedings of the Fourth IASTED International Conference on Financial Engineering
+42
+
+===== PAGE 44 =====
+
+and Applications, 103-108. https://www.utstat.toronto.edu/sjaimung/papers/VAR-
+FPCA.pdf
+James, G., Hastie, T., & Sugar, C. (2000). Principal Component Models for Sparse Functional
+Data.Biometrika,87(3), 587-602. https://doi.org/10.1093/biomet/87.3.587
+Kearney, F., Cummins, M., & Murphy, F. (2018). Forecasting Implied Volatility in Foreign
+Exchange Markets: A Functional Time Series Approach.The European Journal of
+Finance,24(1), 1-18. https://doi.org/10.1080/1351847X.2016.1271441
+Li, C., Xiao, L., & Luo, S. (2020). Fast Covariance Estimation for Multivariate Sparse
+Functional Data.Stat,9(1), e245. https://doi.org/10.1002/sta4.245
+Liang, Z., Weng, F., Ma, Y., Xu, Y., Zhu, M., & Yang, C. (2022). Measurement and Analysis
+of High Frequency Assert Volatility Based on Functional Data Analysis.Mathematics,
+10(7), 1140. https://doi.org/10.3390/math10071140
+Mas, A., & Pumo, B. (2009). Functional Linear Regression with Derivatives.Journal of
+Nonparametric Statistics,21(1), 19-40. https://doi.org/10.1080/10485250802401046
+Petrovich, J. (2018).Functional Principal Component Analysis and Sparse Functional Regres-
+sion[PhD Thesis]. Pennsylvania State University. https://etda.libraries.psu.edu/files/
+final_submissions/17278
+Ramsay, J. O., & Silverman, B. W. (2006).Functional Data Analysis(2. ed., [Nachdr.]).
+Springer.
+Reiss, P. T., & Xu, M. (2020). Tensor product splines and functional principal components
+[Open access].Journal of Statistical Planning and Inference,208, 1-12. https://doi.
+org/10.1016/j.jspi.2019.10.006
+Ruiz-Medina, M. D., Miranda, D., & Espejo, R. M. (2019). Dynamical Multiple Regression
+in Function Spaces, Under Kernel Regressors, with ARH(1) Errors.TEST,28(3),
+943-968. https://doi.org/10.1007/s11749-018-0614-2
+Ruppert, D., Wand, M. P., & Carroll, R. J. (2003).Semiparametric Regression. Cambridge
+University Press. https://doi.org/10.1017/CBO9780511755453
+Shang, H. L., & Kearney, F. (2022). Dynamic Functional Time-Series Forecasts of Foreign
+Exchange Implied Volatility Surfaces.International Journal of Forecasting,38(3),
+1025-1049. https://doi.org/10.1016/j.ijforecast.2021.07.011
+Sui, C., Lung, P., & Yang, M. (2020). Predictable Dynamics in the Implied Volatility Surface
+Based on Weighted Least Squares: Evidence from Soybean Meal Futures Options in
+China.Emerging Markets Finance and Trade,56(11), 2625-2638. https://doi.org/10.
+1080/1540496X.2019.1616543
+Tan, Y., Tan, Z., Tang, Y., & Zhang, Z. (2024). Functional Volatility Forecasting.Journal of
+Forecasting,43(8), 3009-3034. https://doi.org/10.1002/for.3170
+43
+
+===== PAGE 45 =====
+
+Weaver, C., Perryman, B., Jiang, J., Chien, A., Meoded, E., & Kirk, A. (2020, mayo).
+Functional PCA for Implied Volatility Surface Prediction(inf. téc.). Metlife Investment
+Management. Consultado el 27 de mayo de 2025, desde https://investments.metlife.
+com/content/dam/metlifecom/us/investments/insights/research-topics/macro-
+strategy/pdf/MIM_Functional-PCA-Implied-Volatility-Surface-Prediction_051920.
+pdf
+Wood, S. N. (2017).Generalized Additive Models: An Introduction with R(2.a ed.). Chapman;
+Hall/CRC. https://doi.org/10.1201/9781315370279
+44

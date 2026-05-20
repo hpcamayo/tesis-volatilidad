@@ -1,0 +1,3 @@
+test,rmse
+low_rank_surface_K0_3,0.47284260457372324
+full_rank_coefficients_tSinv,7.840478805120255e-15
