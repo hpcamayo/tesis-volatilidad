@@ -1,0 +1,5 @@
+Loss,casos,casos_PM,prop_PM
+MAE_med,24,24,1
+RMSE_med,24,24,1
+WRMSE_long_med,24,24,1
+WRMSE_short_med,24,23,0.9583333333333334

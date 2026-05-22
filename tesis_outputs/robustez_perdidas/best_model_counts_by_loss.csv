@@ -1,6 +1,6 @@
-"Loss","Modelo","Count"
-"MAE_med","PM","24"
-"RMSE_med","PM","24"
-"WRMSE_long_med","PM","24"
-"WRMSE_short_med","PA","1"
-"WRMSE_short_med","PM","23"
+Loss,Modelo,casos,total_casos,prop
+MAE_med,PM,24,24,1
+RMSE_med,PM,24,24,1
+WRMSE_long_med,PM,24,24,1
+WRMSE_short_med,PM,23,24,0.9583333333333334
+WRMSE_short_med,PA,1,24,0.041666666666666664

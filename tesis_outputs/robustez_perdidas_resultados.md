@@ -1,6 +1,6 @@
 # Resultados de robustez por funcion de perdida
 
-Se ejecuto la robustez por funcion de perdida para los 8 pares y 3 horizontes usando la especificacion principal `base_4x8`, con los `TRAIN_SIZE` y `K0` guardados en la corrida principal. No se retunearon hiperparametros.
+Se ejecuto la robustez por funcion de perdida para los 8 pares y 3 horizontes usando la especificacion principal `base_4x8`, con los `TRAIN_SIZE` y `K0` de la corrida principal.
 
 ## Perdidas evaluadas
 
@@ -51,8 +51,10 @@ La unica excepcion, USD/COP a horizonte 10 bajo ponderacion de tenores cortos, f
 Los resultados estan en:
 
 ```text
-tesis_outputs/robustez_bases/tabla_basis_losses_long.csv
-tesis_outputs/robustez_bases/tabla_basis_robust_loss.csv
-tesis_outputs/robustez_bases/tabla_basis_best_by_loss.csv
-tesis_outputs/robustez_bases/tabla_basis_pm_dominance.csv
+tesis_outputs/robustez_perdidas/losses_long.csv
+tesis_outputs/robustez_perdidas/loss_summary_by_model.csv
+tesis_outputs/robustez_perdidas/best_model_by_loss.csv
+tesis_outputs/robustez_perdidas/pm_dominance_by_pair_loss.csv
+tesis_outputs/robustez_perdidas/best_model_counts_by_loss.csv
+tesis_outputs/robustez_perdidas/non_pm_winners.csv
 ```

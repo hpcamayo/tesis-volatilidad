@@ -61,7 +61,7 @@ Esta tesis estudia la representación funcional y la evaluación predictiva de \
 
 La contribución empírica consiste en separar dos preguntas que suelen confundirse. La primera es descriptiva: si la FPCA representa, comprime e interpreta de manera parsimoniosa las \SVIs{}. La segunda es predictiva: si los modelos dinámicos construidos sobre puntajes FPCA superan a un benchmark de persistencia cruda en pronóstico fuera de muestra. La distinción es central porque una superficie puede tener estructura de baja dimensión y, aun así, la dinámica estimada sobre esa estructura puede no reducir el error de pronóstico sobre la malla observada.
 
-Con datos diarios de Bloomberg para ocho pares de divisas entre el 4 de febrero de 2025 y el 27 de marzo de 2026, se verifican 299 superficies completas por par, cada una con 65 nodos. Los resultados descriptivos muestran una estructura de baja dimensión: en todos los pares, una o dos componentes explican al menos 95\% de la variación funcional, y dos o tres componentes explican al menos 99\%. En cambio, el ejercicio predictivo entrega un resultado negativo pero informativo: bajo RMSE sobre la malla observada, la persistencia cruda (PM) obtiene la menor mediana de error en los ocho pares y en los tres horizontes evaluados (\(h=1,5,10\)). Los modelos PA, VAR(1), ARH en incrementos y KernelARH no logran superar este benchmark. La evidencia apoya la utilidad descriptiva de la representación funcional y rechaza la hipótesis de superioridad predictiva de los modelos dinámicos FPCA en este diseño.
+Con datos diarios de Bloomberg para ocho pares de divisas entre el 4 de febrero de 2025 y el 27 de marzo de 2026, se verifican 299 superficies completas por par, cada una con 65 nodos. Los resultados descriptivos muestran una estructura de baja dimensión: en todos los pares, una o dos componentes explican al menos 95\% de la variación funcional, y dos o tres componentes explican al menos 99\%. En cambio, el ejercicio predictivo entrega un resultado negativo pero informativo: bajo RMSE sobre la malla observada, la persistencia cruda (PM) obtiene la menor mediana de error en los ocho pares y en los tres horizontes evaluados (\(h=1,5,10\)). La robustez por funciones de pérdida confirma el resultado: PM gana 24 de 24 casos bajo RMSE, MAE y RMSE ponderado hacia vencimientos largos, y 23 de 24 bajo RMSE ponderado hacia vencimientos cortos. Los modelos PA, VAR(1), ARH en incrementos y KernelARH no logran superar este benchmark de manera sistemática. La evidencia apoya la utilidad descriptiva de la representación funcional y rechaza la hipótesis de superioridad predictiva de los modelos dinámicos FPCA en este diseño.
 \end{abstract}
 
 \noindent\textbf{Palabras clave:} volatilidad implícita, superficies funcionales, FPCA, B-splines tensoriales, mercados cambiarios, backtesting, persistencia.
@@ -96,7 +96,7 @@ Los objetivos específicos son:
   \item Representar cada superficie como una función bidimensional sobre delta y tenor mediante una base B-spline tensorial.
   \item Aplicar FPCA en la métrica funcional correcta, usando la matriz de Gram y su factorización de Cholesky para evitar distorsiones por la no ortonormalidad de la base.
   \item Diseñar un backtest fuera de muestra sin filtración temporal, con selección conjunta de ventana de entrenamiento y número de componentes.
-  \item Comparar PM, PA, VAR(1), ARH en incrementos y KernelARH mediante RMSE sobre la malla observada, tasas de acierto y pruebas de Diebold-Mariano.
+  \item Comparar PM, PA, VAR(1), ARH en incrementos y KernelARH mediante RMSE sobre la malla observada, tasas de acierto, pruebas de Diebold-Mariano y pruebas de robustez por función de pérdida y especificación de base.
   \item Interpretar los resultados distinguiendo éxito descriptivo, desempeño predictivo y fuentes de error de representación, truncación y estimación dinámica.
 \end{enumerate}
 
@@ -106,7 +106,7 @@ La tesis evalúa tres hipótesis:
 
 \begin{description}
   \item[H1.] Las \SVIs{} de divisas pueden representarse mediante una estructura FPCA de baja dimensión. Esta hipótesis es apoyada por la evidencia.
-  \item[H2.] Los modelos dinámicos sobre puntajes FPCA mejoran la precisión fuera de muestra frente a la persistencia cruda. Esta hipótesis es rechazada bajo RMSE mediano sobre la malla observada para los ocho pares y tres horizontes evaluados.
+  \item[H2.] Los modelos dinámicos sobre puntajes FPCA mejoran la precisión fuera de muestra frente a la persistencia cruda. Esta hipótesis es rechazada en la especificación principal bajo RMSE mediano sobre la malla observada para los ocho pares y tres horizontes evaluados.
   \item[H3.] La persistencia cruda constituye un benchmark exigente para pronósticos de corto y mediano plazo de \SVIs{}. Esta hipótesis es apoyada por la evidencia empírica.
 \end{description}
 
@@ -564,6 +564,30 @@ Las pruebas de Diebold-Mariano se aplican a la diferencia de pérdidas:
 \]
 Con esta convención, un estadístico DM negativo indica que el modelo alternativo tiene mayor pérdida que PM.
 
+Como análisis de robustez, se calculan tres pérdidas adicionales sobre las mismas predicciones fuera de muestra. La primera es el error absoluto medio:
+\[
+  MAE_{t,h}^{(m)}
+  =
+  \frac{1}{65}\sum_{q=1}^{65}
+  \left|
+  \widehat y_{t+h|t,q}^{(m)}-y_{t+h,q}
+  \right|.
+\]
+Las otras dos son RMSE ponderados por tenor:
+\[
+  WRMSE_{t,h}^{(m)}(w)
+  =
+  \left[
+  \frac{\sum_{q=1}^{65}w_q
+  \left(
+  \widehat y_{t+h|t,q}^{(m)}-y_{t+h,q}
+  \right)^2}{\sum_{q=1}^{65}w_q}
+  \right]^{1/2}.
+\]
+Para enfatizar vencimientos cortos se usa \(w_q\propto 1/\sqrt{\tau_q}\); para enfatizar vencimientos largos se usa \(w_q\propto \sqrt{\tau_q}\). En ambos casos los pesos se normalizan para tener promedio uno.
+
+Finalmente, se evalúa robustez a la resolución de la base B-spline. Además de la especificación principal \(\texttt{base\_4x8}\), se consideran una base parsimoniosa \(\texttt{coarse\_4x6}\) y una base flexible \(\texttt{rich\_5x10}\). En esta prueba se mantiene fijo el \(TRAIN\_SIZE\) seleccionado por la corrida principal de cada par y se reoptimiza \(K_0\) por horizonte y base. Esto permite distinguir si las conclusiones predictivas dependen de la suavidad impuesta por la base.
+
 \section{Datos}
 
 La base de datos proviene de superficies diarias publicadas por Bloomberg para ocho pares de divisas. Luego del filtrado por superficies completas, cada par cuenta con 299 fechas desde el 4 de febrero de 2025 hasta el 27 de marzo de 2026. Los pares son:
@@ -652,6 +676,35 @@ USD/ZAR & 0.955 & 0.032 & 0.011 & 0.903 & 0.963 & 2.73 & -0.84 \\
 La Tabla \ref{tab:fpca_scores} muestra que los puntajes son persistentes. La autocorrelación de primer orden de PC1 se ubica entre 0.826 y 0.986, y la de PC2 alcanza valores superiores a 0.96 en USD/COP, USD/CLP, USD/MXN y USD/ZAR. Por tanto, la ausencia de mejora predictiva no se debe a que los factores carezcan de memoria temporal. El problema es más específico: la memoria de los puntajes, al ser proyectada, truncada y reconstruida, no reduce el error frente a copiar la malla observada.
 
 Los pares también difieren en el tipo de dinámica latente. USD/PEN es el caso más bifactorial: PC1 explica 74.1\% y PC2 24.0\%, con desplazamientos netos de -3.79 y 2.31 desvíos estándar, respectivamente. Esto indica una rotación importante entre dos factores funcionales, no solo un cambio de nivel. USD/COP también tiene una PC2 persistente, aunque su peso de varianza es menor. USD/CLP, USD/BRL y USD/ARS son más unifactoriales: PC1 explica entre 98.3\% y 98.9\%, por lo que la dinámica global se concentra en un factor de nivel dominante. USD/MXN, EUR/USD y USD/ZAR se ubican en una zona intermedia, con PC1 cercana a 95\% y componentes secundarias persistentes que capturan cambios de forma.
+
+\subsection{FPCA rolling como diagnóstico de cambios de régimen}
+
+La FPCA global resume la variación de toda la muestra, pero puede mezclar estados locales distintos. Para evaluar esta posibilidad, se recalcula la FPCA en ventanas móviles de 22, 44, 66, 88, 110 y 132 días hábiles, equivalentes aproximadamente a uno a seis meses. Este diagnóstico es descriptivo: no usa observaciones futuras para el backtest y no modifica la comparación predictiva. Su objetivo es medir si la baja dimensión funcional se mantiene localmente y si las direcciones principales locales se alejan del subespacio global.
+
+\begin{table}[H]
+\centering
+\caption{FPCA rolling: varianza explicada local y distancia al subespacio global}
+\label{tab:rolling_fpca}
+\scriptsize
+\begin{tabular}{lrrrrrrr}
+\toprule
+Par & PC1 22d & PC1 66d & PC1 132d & P05 PC1 22d & P05 PC1 132d & \(K_{95}\) 132d & Dist. 132d \\
+\midrule
+USD/PEN & 0.929 & 0.895 & 0.897 & 0.669 & 0.767 & 2 & 0.807 \\
+USD/COP & 0.976 & 0.947 & 0.915 & 0.903 & 0.858 & 2 & 0.350 \\
+USD/CLP & 0.996 & 0.996 & 0.994 & 0.977 & 0.991 & 1 & 0.301 \\
+USD/BRL & 0.983 & 0.978 & 0.975 & 0.942 & 0.965 & 1 & 0.715 \\
+USD/ARS & 0.960 & 0.930 & 0.959 & 0.610 & 0.575 & 1 & 0.817 \\
+USD/MXN & 0.975 & 0.962 & 0.960 & 0.924 & 0.930 & 1 & 0.458 \\
+EUR/USD & 0.976 & 0.970 & 0.963 & 0.784 & 0.902 & 1 & 0.452 \\
+USD/ZAR & 0.981 & 0.982 & 0.955 & 0.918 & 0.916 & 1 & 0.301 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+La Tabla \ref{tab:rolling_fpca} muestra tres patrones. Primero, la baja dimensión es localmente robusta: incluso en ventanas cortas, la mediana de PC1 suele ser elevada y \(K_{95}\) a seis meses es uno o dos componentes. Segundo, USD/PEN y USD/ARS presentan mayor evidencia de cambios de régimen. En USD/PEN, PC1 global explica solo 74.05\%, pero PC1 rolling se ubica cerca de 90\%; esto sugiere que cada subperiodo es relativamente simple, aunque el eje dominante cambia a lo largo del tiempo. En USD/ARS, el percentil 5 de PC1 cae hasta 0.575 en ventanas de 132 días, señal de episodios donde la superficie deja de comportarse como un sistema unifactorial. Tercero, USD/CLP es el caso más estable: PC1 rolling permanece alrededor de 99\% y \(K_{95}=1\) a seis meses.
+
+Este diagnóstico refuerza la lectura descriptiva de la tesis. La FPCA no solo comprime las superficies; también revela heterogeneidad temporal en la geometría de los factores. Sin embargo, esta evidencia no implica superioridad predictiva. Más bien justifica el uso de ventanas rolling-locales en el backtest y sugiere, como extensión futura, modelos con componentes o parámetros dependientes del régimen.
 
 \section{Resultados predictivos fuera de muestra}
 
@@ -773,6 +826,62 @@ Las tasas de acierto confirman que las alternativas rara vez superan a PM en fec
 
 En las pruebas Diebold-Mariano, 86 de las 96 comparaciones modelo-horizonte-par identifican inferioridad estadísticamente significativa de la alternativa frente a PM al 5\%. En las 10 comparaciones restantes, no hay evidencia estadística de mejora de la alternativa; en todas ellas la mediana de RMSE de PM sigue siendo menor. Por tanto, el resultado global no depende de un único par ni de una sola especificación dinámica.
 
+\subsection{Robustez por función de pérdida}
+
+Para verificar que la conclusión no dependa únicamente del RMSE uniforme sobre la malla, se recalculó el desempeño con cuatro pérdidas medianas: RMSE, MAE, RMSE ponderado hacia vencimientos cortos y RMSE ponderado hacia vencimientos largos. Los pesos por tenor se normalizan para tener promedio uno, de modo que solo cambian la importancia relativa de los tramos corto y largo de la curva.
+
+\begin{table}[H]
+\centering
+\caption{Dominancia de PM por función de pérdida en la especificación principal}
+\label{tab:loss_robustness}
+\small
+\begin{tabular}{lrrr}
+\toprule
+Pérdida & Casos PM & Total & Proporción PM \\
+\midrule
+MAE & 24 & 24 & 100.0\% \\
+RMSE & 24 & 24 & 100.0\% \\
+WRMSE largo & 24 & 24 & 100.0\% \\
+WRMSE corto & 23 & 24 & 95.8\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+La Tabla \ref{tab:loss_robustness} confirma que la dominancia de PM no es un artefacto de la pérdida principal. PM gana todos los casos bajo RMSE, MAE y ponderación hacia vencimientos largos. La única excepción aparece en USD/COP a \(h=10\) bajo ponderación hacia vencimientos cortos, donde PA obtiene una mediana de 0.930 frente a 0.936 de PM. Esta excepción favorece una persistencia suavizada, no un modelo dinámico en puntajes. Por tanto, las pérdidas alternativas no aportan evidencia de superioridad sistemática de VAR1, ARHinc o KernelARH.
+
+\subsection{Robustez a la especificación de base B-spline}
+
+Como prueba adicional, se reestimó el backtest bajo tres bases tensoriales: la especificación principal \(\texttt{base\_4x8}\), una base más parsimoniosa \(\texttt{coarse\_4x6}\) y una base más flexible \(\texttt{rich\_5x10}\). En esta prueba se mantiene fijo el \(TRAIN\_SIZE\) seleccionado en la corrida principal y se reoptimiza \(K_0\) por par, horizonte y base. El objetivo es aislar si la conclusión depende de la resolución de la base B-spline.
+
+\begin{table}[H]
+\centering
+\caption{Dominancia de PM por base y función de pérdida}
+\label{tab:basis_robustness}
+\scriptsize
+\begin{tabular}{llrrr}
+\toprule
+Base & Pérdida & Casos PM & Total & Proporción PM \\
+\midrule
+\texttt{base\_4x8} & MAE & 24 & 24 & 100.0\% \\
+\texttt{base\_4x8} & RMSE & 24 & 24 & 100.0\% \\
+\texttt{base\_4x8} & WRMSE largo & 24 & 24 & 100.0\% \\
+\texttt{base\_4x8} & WRMSE corto & 23 & 24 & 95.8\% \\
+\texttt{coarse\_4x6} & MAE & 24 & 24 & 100.0\% \\
+\texttt{coarse\_4x6} & RMSE & 24 & 24 & 100.0\% \\
+\texttt{coarse\_4x6} & WRMSE largo & 24 & 24 & 100.0\% \\
+\texttt{coarse\_4x6} & WRMSE corto & 23 & 24 & 95.8\% \\
+\texttt{rich\_5x10} & MAE & 23 & 24 & 95.8\% \\
+\texttt{rich\_5x10} & RMSE & 18 & 24 & 75.0\% \\
+\texttt{rich\_5x10} & WRMSE largo & 23 & 24 & 95.8\% \\
+\texttt{rich\_5x10} & WRMSE corto & 16 & 24 & 66.7\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+La base principal y la base parsimoniosa entregan el mismo mensaje: PM domina casi todos los casos, con la misma excepción de USD/COP en \(h=10\) bajo WRMSE corto. La base flexible \(\texttt{rich\_5x10}\) introduce más excepciones, especialmente en horizontes \(h=5\) y \(h=10\) y en pérdidas ponderadas. Bajo esta base, PM sigue ganando 23 de 24 casos en MAE, 23 de 24 en WRMSE largo y 18 de 24 en RMSE, pero cae a 16 de 24 en WRMSE corto. Las excepciones se concentran en PA y en algunos casos puntuales de ARHinc o KernelARH; no constituyen una dominancia sistemática de modelos dinámicos.
+
+La interpretación es que una base más flexible puede reducir el costo de reconstrucción de algunas alternativas en celdas específicas, sobre todo cuando la pérdida enfatiza vencimientos cortos. Esto matiza, pero no revierte, el resultado principal. La conclusión defendible no es que PM gane absolutamente toda variante posible, sino que PM domina la especificación principal, la base parsimoniosa y la mayoría de celdas robustas; las ganancias dinámicas que aparecen con la base rica son locales, dependientes de la pérdida y no generalizadas.
+
 \section{Diagnósticos de estabilidad}
 
 Los diagnósticos ayudan a interpretar por qué la baja dimensión descriptiva no se traduce en superioridad predictiva.
@@ -797,13 +906,15 @@ Cuarto, los modelos dinámicos añaden error de estimación. VAR1 es particularm
 
 Quinto, la heterogeneidad de ventanas seleccionadas sugiere no estacionariedad local. USD/PEN selecciona una ventana corta de 44 días, mientras que USD/COP selecciona 154 días y USD/BRL 132 días. No existe una ventana universal que capture por igual la dinámica de todos los pares. Esta heterogeneidad es esperable en mercados con distinta microestructura, liquidez y sensibilidad macrofinanciera.
 
+Sexto, las pruebas de robustez refinan la conclusión. Bajo la especificación principal, PM domina también al cambiar la función de pérdida, salvo una excepción PA en USD/COP bajo ponderación de vencimientos cortos. Al cambiar la base B-spline, la base parsimoniosa preserva prácticamente el mismo resultado, mientras que la base más flexible genera excepciones locales. Esto indica que la resolución de la base puede importar para ciertos tramos de la superficie, pero no produce una mejora dinámica consistente en pares, horizontes y pérdidas.
+
 El resultado negativo es metodológicamente relevante. Rechazar una hipótesis predictiva frente a un benchmark fuerte no invalida la tesis; al contrario, delimita con precisión qué aporta el enfoque funcional. La FPCA sirve para representar, comprimir e interpretar superficies. El backtest muestra que esta ventaja descriptiva no garantiza superioridad predictiva bajo RMSE crudo y horizontes cortos o medianos.
 
 \section{Limitaciones}
 
 La primera limitación es la longitud de la muestra. Aunque 299 superficies completas representan una base valiosa para mercados latinoamericanos, siguen siendo pocas observaciones para estimar modelos dinámicos flexibles, especialmente variantes kernel o sistemas VAR de dimensión moderada.
 
-La segunda limitación es la métrica de evaluación. El RMSE sobre malla observada favorece modelos que reproducen directamente los nodos crudos. PM no impone suavidad, no reconstruye y no filtra ruido. En aplicaciones de valorización, gestión de riesgo o construcción de superficies económicamente consistentes, podrían ser relevantes otras métricas que ponderen tenores, deltas, no arbitraje o pérdidas económicas.
+La segunda limitación es la métrica de evaluación. El RMSE sobre malla observada favorece modelos que reproducen directamente los nodos crudos. PM no impone suavidad, no reconstruye y no filtra ruido. Las pruebas de robustez con MAE y RMSE ponderado reducen esta preocupación, pero no agotan el universo de pérdidas económicamente relevantes. En aplicaciones de valorización, gestión de riesgo o construcción de superficies económicamente consistentes, podrían ser relevantes otras métricas que ponderen tenores, deltas, no arbitraje o pérdidas económicas.
 
 La tercera limitación es que los pronósticos usan únicamente información interna de la superficie. No se incorporan variables exógenas como spot, tasas de interés, diferencial de tasas, carry, liquidez, precios de commodities o indicadores de estrés. Tales variables podrían ser relevantes para horizontes mayores.
 
@@ -819,7 +930,7 @@ En la dimensión descriptiva, los resultados son contundentes. Los ocho pares cu
 
 En la dimensión predictiva, la evidencia rechaza H2. En los ocho pares y tres horizontes evaluados, PM obtiene el menor RMSE mediano. Las alternativas PA, VAR1, ARHinc y KernelARH no superan de manera sistemática el benchmark. En USD/PEN, el resultado es especialmente claro: PM registra RMSE medianos de 0.1200, 0.3227 y 0.4223 para \(h=1,5,10\), mientras que las mejores alternativas no PM registran 0.9670, 0.9998 y 1.0394. Las pruebas DM indican inferioridad estadística de las alternativas en todos los horizontes de USD/PEN.
 
-La evidencia también apoya H3. La persistencia cruda es un benchmark difícil porque las superficies son persistentes y porque PM no incurre en errores de suavizado, truncación o estimación. El éxito descriptivo de FPCA no garantiza menor pérdida predictiva sobre una malla cruda.
+La evidencia también apoya H3. La persistencia cruda es un benchmark difícil porque las superficies son persistentes y porque PM no incurre en errores de suavizado, truncación o estimación. Las pruebas de robustez muestran que esta conclusión se mantiene bajo MAE, ponderaciones por tenor y bases alternativas, aunque una base más flexible genera excepciones locales en algunos pares y horizontes. El éxito descriptivo de FPCA no garantiza menor pérdida predictiva sobre una malla cruda.
 
 El aporte final de la tesis es, por tanto, una lectura equilibrada. La metodología funcional proporciona una representación parsimoniosa, interpretable y reproducible de superficies de volatilidad implícita. El ejercicio de pronóstico, diseñado sin filtración temporal y comparado contra una referencia fuerte, muestra que los modelos dinámicos en puntajes FPCA no mejoran la precisión fuera de muestra bajo RMSE en esta muestra. Este resultado negativo es informativo para investigación y práctica: antes de introducir dinámica sofisticada, es indispensable medir su valor incremental frente a persistencia cruda.
 
@@ -849,6 +960,9 @@ La corrida final se generó con el script \texttt{tesis\_volatilidad\_analysis\_
   \item \texttt{tesis\_outputs/resumen\_tasa\_aciertos.csv}
   \item \texttt{tesis\_outputs/resumen\_dm.csv}
   \item \texttt{tesis\_outputs/resumen\_estabilidad\_modelos.csv}
+  \item \texttt{tesis\_outputs/rolling\_fpca\_resumen\_multimoneda.csv}
+  \item \texttt{tesis\_outputs/robustez\_perdidas/}
+  \item \texttt{tesis\_outputs/robustez\_bases/}
 \end{itemize}
 
 \begin{thebibliography}{99}

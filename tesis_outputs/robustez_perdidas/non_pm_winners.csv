@@ -1,2 +1,2 @@
-"Par","h","Loss","Modelo","Valor","TRAIN_SIZE","K0","N"
-"USDCOP","10","WRMSE_short_med","PA","0.9297","154","8","135"
+pair_id,Par,h,Modelo,TRAIN_SIZE,K0,N,Loss,Valor
+usdcop,USDCOP,10,PA,154,8,135,WRMSE_short_med,0.9297

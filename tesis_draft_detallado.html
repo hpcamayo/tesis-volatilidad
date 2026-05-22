@@ -1,0 +1,2385 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <meta name="author" content="Autor: Henri Paul Camayo Guillermo, henri.camayo@pucp.pe Asesora: Dra. Felícita Doris Miranda Huaynalaya" />
+  <title>Representación funcional y evaluación predictiva de superficies de volatilidad implícita en mercados de divisas Un enfoque basado en B-splines tensoriales, FPCA y backtesting fuera de muestra</title>
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    div.abstract {
+      margin: 2em 2em 2em 2em;
+      text-align: left;
+      font-size: 85%;
+    }
+    div.abstract-title {
+      font-weight: bold;
+      text-align: center;
+      padding: 0;
+      margin-bottom: 0.5em;
+    }
+    code {
+      white-space: pre-wrap;
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title"><strong>Representación funcional y evaluación
+predictiva de superficies de volatilidad implícita en mercados de
+divisas</strong><br />
+Un enfoque basado en B-splines tensoriales, FPCA y backtesting fuera de
+muestra</h1>
+<p class="author">Autor: Henri Paul Camayo Guillermo,
+<code>henri.camayo@pucp.pe</code><br />
+Asesora: Dra. Felícita Doris Miranda Huaynalaya</p>
+<p class="date">20 de mayo de 2026</p>
+<div class="abstract">
+<div class="abstract-title">Abstract</div>
+<p>Esta tesis estudia la representación funcional y la evaluación
+predictiva de superficies de volatilidad implícita en mercados de
+divisas, con énfasis en pares latinoamericanos. El enfoque convierte
+cada superficie diaria, observada en una malla regular de delta y tenor,
+en una función bidimensional aproximada mediante una base B-spline
+tensorial. Sobre esta representación se aplica una corrección métrica
+mediante la matriz de Gram y una descomposición en componentes
+principales funcionales (FPCA), de modo que la reducción de dimensión se
+realiza en la geometría natural <span
+class="math inline"><em>L</em><sup>2</sup>(<em>Δ</em> × <em>T</em>)</span>
+y no en la geometría euclidiana arbitraria de los coeficientes de
+base.</p>
+<p>La contribución empírica consiste en separar dos preguntas que suelen
+confundirse. La primera es descriptiva: si la FPCA representa, comprime
+e interpreta de manera parsimoniosa las superficies de volatilidad
+implícita. La segunda es predictiva: si los modelos dinámicos
+construidos sobre puntajes FPCA superan a un benchmark de persistencia
+cruda en pronóstico fuera de muestra. La distinción es central porque
+una superficie puede tener estructura de baja dimensión y, aun así, la
+dinámica estimada sobre esa estructura puede no reducir el error de
+pronóstico sobre la malla observada.</p>
+<p>Con datos diarios de Bloomberg para ocho pares de divisas entre el 4
+de febrero de 2025 y el 27 de marzo de 2026, se verifican 299
+superficies completas por par, cada una con 65 nodos. Los resultados
+descriptivos muestran una estructura de baja dimensión: en todos los
+pares, una o dos componentes explican al menos 95% de la variación
+funcional, y dos o tres componentes explican al menos 99%. En cambio, el
+ejercicio predictivo entrega un resultado negativo pero informativo:
+bajo RMSE sobre la malla observada, la persistencia cruda (PM) obtiene
+la menor mediana de error en los ocho pares y en los tres horizontes
+evaluados (<span class="math inline"><em>h</em> = 1, 5, 10</span>). La
+robustez por funciones de pérdida confirma el resultado: PM gana 24 de
+24 casos bajo RMSE, MAE y RMSE ponderado hacia vencimientos largos, y 23
+de 24 bajo RMSE ponderado hacia vencimientos cortos. Los modelos PA,
+VAR(1), ARH en incrementos y KernelARH no logran superar este benchmark
+de manera sistemática. La evidencia apoya la utilidad descriptiva de la
+representación funcional y rechaza la hipótesis de superioridad
+predictiva de los modelos dinámicos FPCA en este diseño.</p>
+</div>
+</header>
+<div class="titlepage">
+<p><strong>Representación funcional y evaluación predictiva de
+superficies de volatilidad implícita<br />
+en mercados de divisas</strong></p>
+<p>Un enfoque basado en B-splines tensoriales, FPCA y backtesting fuera
+de muestra</p>
+<p><strong>Autor:</strong> Henri Paul Camayo Guillermo,
+<code>henri.camayo@pucp.pe</code><br />
+<strong>Asesora:</strong> Dra. Felícita Doris Miranda Huaynalaya<br />
+20 de mayo de 2026</p>
+</div>
+<p><strong>Palabras clave:</strong> volatilidad implícita, superficies
+funcionales, FPCA, B-splines tensoriales, mercados cambiarios,
+backtesting, persistencia.</p>
+<h1 id="introducción">Introducción</h1>
+<p>En los mercados de derivados financieros, la superficie de
+volatilidad implícita resume el nivel de volatilidad que el mercado
+incorpora para opciones con diferentes grados de moneyness y
+vencimientos. En divisas, esta superficie es central para la
+valorización de opciones, la gestión de riesgo de mesas de derivados, la
+cobertura de exposiciones y el análisis de episodios de tensión
+cambiaria. A diferencia de una serie univariada de volatilidad, una
+superficie de volatilidad implícita describe simultáneamente la
+estructura transversal por delta y la estructura temporal por tenor, de
+modo que cada observación diaria es un objeto bidimensional.</p>
+<p>Los mercados latinoamericanos añaden dificultades específicas. La
+liquidez suele ser menor que en divisas del G10, la profundidad de
+cotización varía por vencimiento y el comportamiento de la superficie
+puede reflejar episodios de intervención, estrés local o cambios en
+expectativas macrofinancieras. Los modelos paramétricos clásicos, como
+Heston <span class="citation" data-cites="Heston1993"></span> o SABR
+<span class="citation" data-cites="Hagan2002"></span>, proporcionan
+estructuras interpretables y compatibles con la práctica financiera,
+pero pueden ser rígidos cuando se busca capturar patrones empíricos de
+superficies observadas en mallas completas. En este contexto, el
+análisis de datos funcionales (FDA) ofrece una alternativa natural:
+tratar cada superficie como una función y estudiar su variación mediante
+bases, operadores y componentes principales funcionales <span
+class="citation" data-cites="RamsaySilverman2006"></span>.</p>
+<p>La literatura muestra que las superficies de volatilidad suelen estar
+gobernadas por pocos factores latentes. Cont y Da Fonseca <span
+class="citation" data-cites="ContDaFonseca2002"></span> y Fengler et al.
+<span class="citation" data-cites="Fengler2003"></span> documentan
+estructuras comunes en volatilidades implícitas. Jaimungal y Ng <span
+class="citation" data-cites="JaimungalNg2007"></span>, Kearney et al.
+<span class="citation" data-cites="Kearney2018"></span>, Shang y Kearney
+<span class="citation" data-cites="ShangKearney2022"></span>, Weaver et
+al. <span class="citation" data-cites="Weaver2020"></span> y Tan et al.
+<span class="citation" data-cites="Tan2024"></span> desarrollan enfoques
+funcionales o semifuncionales para pronosticar superficies o factores de
+volatilidad. Estas contribuciones motivan la pregunta central de esta
+tesis: en una muestra reciente y densa de superficies cambiarias, ¿la
+estructura funcional de baja dimensión se traduce en ganancias
+predictivas frente a una referencia simple de persistencia?</p>
+<p>La respuesta empírica requiere distinguir dos planos. El primero es
+descriptivo: una representación funcional puede comprimir, suavizar e
+interpretar las superficies de manera eficaz. El segundo es predictivo:
+un modelo dinámico sobre los puntajes FPCA debe mejorar el error fuera
+de muestra sobre una métrica concreta. Esta distinción es crucial. Un
+conjunto pequeño de componentes puede explicar casi toda la varianza
+histórica sin necesariamente reducir el RMSE de pronóstico frente a una
+regla que copia la última superficie observada. La persistencia cruda no
+incurre en error de suavizado, no estima parámetros dinámicos y, en
+horizontes cortos, se beneficia de la fuerte persistencia de las
+superficies de volatilidad.</p>
+<p>Esta tesis propone y evalúa un flujo de trabajo funcional completo.
+Primero, cada superficie diaria se aproxima mediante una base B-spline
+tensorial sobre delta y tenor. Segundo, se corrige la métrica de los
+coeficientes mediante la matriz de Gram y su factorización de Cholesky,
+de modo que la FPCA se realice en la geometría <span
+class="math inline"><em>L</em><sup>2</sup></span> correspondiente.
+Tercero, se comparan modelos de pronóstico fuera de muestra sobre
+puntajes FPCA contra dos persistencias: persistencia cruda en la malla
+observada (PM) y persistencia de la superficie ajustada (PA). La
+evaluación se realiza mediante ventanas móviles, selección libre de
+filtración temporal de <span
+class="math inline"><em>T</em><em>R</em><em>A</em><em>I</em><em>N</em>_<em>S</em><em>I</em><em>Z</em><em>E</em></span>
+y <span class="math inline"><em>K</em><sub>0</sub></span>, RMSE sobre la
+malla observada, tasas de acierto frente a PM y pruebas de
+Diebold-Mariano <span class="citation"
+data-cites="DieboldMariano1995"></span>.</p>
+<p>El resultado principal es doble. En la dimensión descriptiva, la FPCA
+confirma que las superficies de volatilidad implícita de los ocho pares
+analizados poseen una estructura fuertemente de baja dimensión: una o
+dos componentes bastan para alcanzar 95% de varianza explicada, y dos o
+tres para alcanzar 99%. En la dimensión predictiva, la persistencia
+cruda domina bajo RMSE mediano en todos los pares y horizontes de la
+corrida verificada. Por tanto, la tesis no sostiene que los modelos
+dinámicos FPCA superen al benchmark; sostiene que la representación
+funcional es una herramienta potente de compresión e interpretación, y
+que el backtest entrega una prueba rigurosa donde la hipótesis
+predictiva es rechazada.</p>
+<h2 id="objetivos">Objetivos</h2>
+<p>El objetivo general es representar, comprimir, interpretar y evaluar
+predictivamente superficies de volatilidad implícita de mercados de
+divisas mediante un enfoque funcional basado en B-splines tensoriales,
+FPCA y modelos dinámicos en puntajes.</p>
+<p>Los objetivos específicos son:</p>
+<ol>
+<li><p>Revisar la literatura sobre análisis de datos funcionales, bases
+B-spline, FPCA, modelos autorregresivos funcionales, regresión no
+paramétrica y aplicaciones a superficies de volatilidad.</p></li>
+<li><p>Construir un panel diario de superficies de volatilidad implícita
+para ocho pares de divisas, a partir de datos publicados por Bloomberg
+entre febrero de 2025 y marzo de 2026.</p></li>
+<li><p>Representar cada superficie como una función bidimensional sobre
+delta y tenor mediante una base B-spline tensorial.</p></li>
+<li><p>Aplicar FPCA en la métrica funcional correcta, usando la matriz
+de Gram y su factorización de Cholesky para evitar distorsiones por la
+no ortonormalidad de la base.</p></li>
+<li><p>Diseñar un backtest fuera de muestra sin filtración temporal, con
+selección conjunta de ventana de entrenamiento y número de
+componentes.</p></li>
+<li><p>Comparar PM, PA, VAR(1), ARH en incrementos y KernelARH mediante
+RMSE sobre la malla observada, tasas de acierto, pruebas de
+Diebold-Mariano y pruebas de robustez por función de pérdida y
+especificación de base.</p></li>
+<li><p>Interpretar los resultados distinguiendo éxito descriptivo,
+desempeño predictivo y fuentes de error de representación, truncación y
+estimación dinámica.</p></li>
+</ol>
+<h2 id="hipótesis">Hipótesis</h2>
+<p>La tesis evalúa tres hipótesis:</p>
+<dl>
+<dt>H1.</dt>
+<dd>
+<p>Las superficies de volatilidad implícita de divisas pueden
+representarse mediante una estructura FPCA de baja dimensión. Esta
+hipótesis es apoyada por la evidencia.</p>
+</dd>
+<dt>H2.</dt>
+<dd>
+<p>Los modelos dinámicos sobre puntajes FPCA mejoran la precisión fuera
+de muestra frente a la persistencia cruda. Esta hipótesis es rechazada
+en la especificación principal bajo RMSE mediano sobre la malla
+observada para los ocho pares y tres horizontes evaluados.</p>
+</dd>
+<dt>H3.</dt>
+<dd>
+<p>La persistencia cruda constituye un benchmark exigente para
+pronósticos de corto y mediano plazo de superficies de volatilidad
+implícita. Esta hipótesis es apoyada por la evidencia empírica.</p>
+</dd>
+</dl>
+<h2 id="organización-del-trabajo">Organización del trabajo</h2>
+<p>La Sección 2 presenta los conceptos financieros básicos: opciones,
+moneyness, volatilidad implícita y superficies de volatilidad. La
+Sección 3 revisa literatura sobre FDA, B-splines, FPCA y modelos
+dinámicos funcionales. La Sección 4 desarrolla con detalle la
+metodología, desde espacios de Hilbert hasta modelos de pronóstico en
+puntajes FPCA. La Sección 5 describe los datos y la construcción del
+panel. Las Secciones 6 y 7 presentan los resultados descriptivos y
+predictivos. La Sección 8 reporta diagnósticos de estabilidad. Las
+Secciones 9, 10 y 11 discuten los hallazgos, limitaciones y
+conclusiones.</p>
+<h1
+id="conceptos-básicos-sobre-opciones-y-superficies-de-volatilidad-implícita">Conceptos
+básicos sobre opciones y superficies de volatilidad implícita</h1>
+<h2 id="opciones-vanilla">Opciones <em>vanilla</em></h2>
+<p>Una opción <em>vanilla</em> es un contrato financiero derivado cuyo
+comprador adquiere un derecho, mas no una obligación, sobre un activo
+subyacente. Una opción <em>call</em> otorga el derecho a comprar el
+subyacente a un precio de ejercicio <span
+class="math inline"><em>K</em></span> en una fecha de vencimiento <span
+class="math inline"><em>T</em></span>; una opción <em>put</em> otorga el
+derecho a venderlo. Si <span
+class="math inline"><em>S</em><sub><em>T</em></sub></span> denota el
+precio del subyacente al vencimiento, los pagos terminales son: <span
+class="math display">Call : max (<em>S</em><sub><em>T</em></sub> − <em>K</em>, 0),   Put : max (<em>K</em> − <em>S</em><sub><em>T</em></sub>, 0).</span>
+La prima es el precio que el comprador paga por adquirir ese derecho. En
+opciones de divisas, el subyacente es un tipo de cambio. Por ejemplo, en
+USD/PEN el subyacente es el precio del dólar estadounidense expresado en
+soles peruanos.</p>
+<h2 id="moneyness-delta-y-estructura-de-la-malla">Moneyness, delta y
+estructura de la malla</h2>
+<p>La <em>moneyness</em> compara el precio de ejercicio <span
+class="math inline"><em>K</em></span> con el precio spot <span
+class="math inline"><em>S</em><sub>0</sub></span>. En términos simples,
+una opción está <em>at-the-money</em> (ATM) cuando <span
+class="math inline"><em>K</em> ≈ <em>S</em><sub>0</sub></span>; está
+<em>in-the-money</em> cuando el ejercicio sería favorable bajo las
+condiciones actuales; y está <em>out-of-the-money</em> cuando el
+ejercicio no sería favorable. Una medida usual es la log-moneyness:
+<span
+class="math display"><em>L</em> = log (<em>K</em>/<em>S</em><sub>0</sub>).</span>
+Sin embargo, en mercados de divisas la cotización práctica de
+volatilidades suele organizarse por delta. La delta mide la sensibilidad
+del precio de la opción frente a cambios en el subyacente y permite
+ordenar las opciones por exposición económica. La base usada en esta
+tesis contiene cinco niveles de delta: <span
+class="math display"><em>Δ</em> = {25<em>P</em>, 10<em>P</em>, <em>A</em><em>T</em><em>M</em>, 10<em>C</em>, 25<em>C</em>},</span>
+que se codifican numéricamente como: <span
+class="math display">{−0.25, −0.10, 0, 0.10, 0.25}.</span> Los niveles
+negativos corresponden al ala put, el nivel cero al punto ATM y los
+niveles positivos al ala call.</p>
+<h2 id="volatilidad-implícita">Volatilidad implícita</h2>
+<p>La volatilidad implícita es el parámetro <span
+class="math inline"><em>σ</em></span> que, introducido en una fórmula de
+valorización, iguala el precio teórico de una opción con su precio
+observado de mercado: <span
+class="math display"><em>P</em><sub>modelo</sub>(<em>S</em><sub>0</sub>, <em>K</em>, <em>T</em>, <em>σ</em>) = <em>P</em><sub>mercado</sub>.</span>
+No se trata de una volatilidad histórica directamente observada, sino de
+una variable inferida desde precios. Es una forma compacta de expresar
+la expectativa y la compensación de riesgo incorporadas por el mercado
+para distintas opciones.</p>
+<p>En un modelo Black-Scholes ideal, todas las opciones sobre un mismo
+subyacente y vencimiento compartirían una misma volatilidad. En la
+práctica, la volatilidad implícita varía por strike, delta y tenor. Esa
+variación produce sonrisas, sesgos y estructuras temporales que
+contienen información sobre riesgos de cola, demanda de cobertura,
+liquidez y expectativas macrofinancieras.</p>
+<h2 id="superficie-de-volatilidad-implícita">Superficie de volatilidad
+implícita</h2>
+<p>Una superficie de volatilidad implícita es una función bivariada que
+asigna una volatilidad implícita a cada combinación de moneyness o delta
+y vencimiento: <span
+class="math display"><em>σ</em><sub>imp</sub> : (<em>δ</em>, <em>τ</em>) ↦ <em>σ</em><sub>imp</sub>(<em>δ</em>, <em>τ</em>).</span>
+En esta tesis, cada superficie se observa en cinco deltas y trece
+tenores: <span
+class="math display"><em>T</em> = {1<em>W</em>, 2<em>W</em>, 1<em>M</em>, 2<em>M</em>, 3<em>M</em>, 6<em>M</em>, 9<em>M</em>, 1<em>Y</em>, 18<em>M</em>, 2<em>Y</em>, 3<em>Y</em>, 4<em>Y</em>, 5<em>Y</em>}.</span>
+Por tanto, cada superficie diaria tiene <span
+class="math inline">5 × 13 = 65</span> nodos.</p>
+<p>Dos cortes de la superficie son especialmente relevantes. El primero
+es el <em>smile</em> de volatilidad, que fija un vencimiento <span
+class="math inline"><em>τ</em><sub>0</sub></span> y observa cómo cambia
+la volatilidad entre deltas: <span
+class="math display"><em>δ</em> ↦ <em>σ</em><sub>imp</sub>(<em>δ</em>, <em>τ</em><sub>0</sub>).</span>
+El segundo es la estructura temporal, que fija un delta, usualmente ATM,
+y observa cómo cambia la volatilidad por tenor: <span
+class="math display"><em>τ</em> ↦ <em>σ</em><sub>imp</sub>(0, <em>τ</em>).</span>
+La superficie completa integra ambas dimensiones: forma transversal y
+estructura temporal.</p>
+<h2
+id="construcción-práctica-desde-atm-risk-reversal-y-butterfly">Construcción
+práctica desde ATM, risk reversal y butterfly</h2>
+<p>En opciones de divisas, Bloomberg y otras fuentes de mercado suelen
+reportar volatilidades mediante cotizaciones estándar ATM, <em>risk
+reversal</em> (RR) y <em>butterfly</em> (BF). Sea <span
+class="math inline"><em>σ</em><sub>ATM</sub></span> la volatilidad
+at-the-money, y <span
+class="math inline"><em>σ</em><sub><em>x</em><em>C</em></sub></span>,
+<span
+class="math inline"><em>σ</em><sub><em>x</em><em>P</em></sub></span> las
+volatilidades de call y put con delta <span
+class="math inline"><em>x</em> ∈ {10, 25}</span>. Las convenciones
+habituales son: <span
+class="math display">$$RR_x=\sigma_{xC}-\sigma_{xP},
+  \qquad
+  BF_x=\frac{\sigma_{xC}+\sigma_{xP}}{2}-\sigma_{\text{ATM}}.$$</span>
+Resolviendo el sistema: <span
+class="math display">$$\sigma_{xC}=\sigma_{\text{ATM}}+BF_x+\frac{1}{2}RR_x,
+  \qquad
+  \sigma_{xP}=\sigma_{\text{ATM}}+BF_x-\frac{1}{2}RR_x.$$</span> Así,
+para cada fecha y tenor se recuperan los cinco puntos <span
+class="math inline">{25<em>P</em>, 10<em>P</em>, <em>A</em><em>T</em><em>M</em>, 10<em>C</em>, 25<em>C</em>}</span>,
+que constituyen la sección transversal de la superficie.</p>
+<h2 id="patrones-típicos">Patrones típicos</h2>
+<p>La forma de una superficie de volatilidad implícita suele describirse
+mediante tres patrones:</p>
+<ul>
+<li><p><strong>Nivel:</strong> desplazamiento casi paralelo de la
+superficie; refleja cambios generales en incertidumbre o prima de
+volatilidad.</p></li>
+<li><p><strong>Skew o inclinación:</strong> diferencia entre alas put y
+call; en divisas puede relacionarse con demanda de cobertura ante
+depreciaciones o apreciaciones extremas.</p></li>
+<li><p><strong>Curvatura o butterfly:</strong> convexidad del smile;
+captura la valoración relativa de eventos de cola frente a movimientos
+moderados.</p></li>
+</ul>
+<p>Estos patrones motivan la interpretación de las componentes
+principales funcionales. Si una primera componente mueve casi toda la
+superficie en la misma dirección, se interpreta como factor de nivel. Si
+una segunda componente separa alas o tenores, se interpreta como factor
+de skew, pendiente o curvatura.</p>
+<h1 id="revisión-de-literatura">Revisión de literatura</h1>
+<p>El análisis de datos funcionales extiende métodos estadísticos a
+observaciones que son curvas, superficies u otros objetos definidos
+sobre dominios continuos. Ramsay y Silverman <span class="citation"
+data-cites="RamsaySilverman2006"></span> establecen el marco clásico
+para representar funciones mediante bases, estimar componentes
+principales funcionales y trabajar con métricas en espacios de Hilbert.
+En contextos de datos escasos o irregulares, James et al. <span
+class="citation" data-cites="JamesHastieSugar2000"></span>, Petrovich
+<span class="citation" data-cites="Petrovich2018"></span> y Li et al.
+<span class="citation" data-cites="Li2020"></span> discuten estrategias
+de reducción de dimensión y estimación funcional.</p>
+<p>Las bases B-spline son particularmente útiles por su soporte local y
+estabilidad numérica. La construcción de splines se apoya en de Boor
+<span class="citation" data-cites="DeBoor2001"></span>; los P-splines y
+extensiones penalizadas son desarrollados por Eilers y Marx <span
+class="citation" data-cites="EilersMarx2003"></span>, Ruppert et al.
+<span class="citation" data-cites="Ruppert2003"></span> y Wood <span
+class="citation" data-cites="Wood2017"></span>. Para superficies
+bidimensionales, las bases tensoriales permiten formar funciones de dos
+variables mediante productos de bases unidimensionales. Reiss y Xu <span
+class="citation" data-cites="ReissXu2020"></span> muestran la relevancia
+de splines tensoriales para componentes principales funcionales.</p>
+<p>En finanzas, Cont y Da Fonseca <span class="citation"
+data-cites="ContDaFonseca2002"></span> documentan dinámicas de
+superficies de volatilidad implícita y factores comunes. Fengler et al.
+<span class="citation" data-cites="Fengler2003"></span> estudian
+componentes principales comunes en volatilidades implícitas. Jaimungal y
+Ng <span class="citation" data-cites="JaimungalNg2007"></span> aplican
+FPCA a series financieras, mientras que Grith et al. <span
+class="citation" data-cites="Grith2018"></span> desarrollan FPCA para
+derivados de curvas multivariadas. En mercados de divisas, Kearney et
+al. <span class="citation" data-cites="Kearney2018"></span>, Shang y
+Kearney <span class="citation" data-cites="ShangKearney2022"></span> y
+Weaver et al. <span class="citation" data-cites="Weaver2020"></span>
+analizan pronósticos de superficies de volatilidad usando enfoques
+funcionales. Avellaneda et al. <span class="citation"
+data-cites="Avellaneda2020"></span> estudian PCA para superficies de
+volatilidad de opciones sobre índices accionarios. Tan et al. <span
+class="citation" data-cites="Tan2024"></span> proponen modelos
+funcionales de pronóstico de volatilidad.</p>
+<p>La dimensión dinámica se relaciona con procesos autorregresivos en
+espacios de Hilbert. Bosq <span class="citation"
+data-cites="Bosq2000"></span> introduce procesos lineales funcionales y
+modelos ARH; Bosq y Blanke <span class="citation"
+data-cites="BosqBlanke2007"></span> extienden inferencia y predicción en
+alta dimensión. Aue et al. <span class="citation"
+data-cites="Aue2015"></span> desarrollan teoría de predicción para
+series funcionales estacionarias. Mas y Pumo <span class="citation"
+data-cites="MasPumo2009"></span> estudian regresión funcional con
+derivadas. Ferraty y Vieu <span class="citation"
+data-cites="FerratyVieu2006"></span> ofrecen fundamentos para regresión
+funcional no paramétrica. Ruiz-Medina et al. <span class="citation"
+data-cites="RuizMedina2019"></span> proponen regresión múltiple dinámica
+en espacios funcionales con regresores kernel y errores ARH(1). Liang et
+al. <span class="citation" data-cites="Liang2022"></span> aplican FDA a
+volatilidad de alta frecuencia.</p>
+<p>Esta tesis se ubica en la intersección de dichas literaturas, pero
+enfatiza una distinción metodológica: la calidad descriptiva de la FPCA
+no debe confundirse con superioridad predictiva. Por ello, el componente
+empírico se diseña como una comparación estricta contra persistencia
+cruda, que es un benchmark simple pero muy competitivo cuando las
+superficies son altamente persistentes.</p>
+<h1 id="metodología">Metodología</h1>
+<h2 id="análisis-de-datos-funcionales">Análisis de datos
+funcionales</h2>
+<p>El análisis de datos funcionales aborda datos cuyas observaciones
+pueden representarse como funciones continuas sobre un dominio. A
+diferencia de los métodos multivariados tradicionales, donde cada
+observación es un vector de dimensión fija sin estructura geométrica
+explícita, en FDA cada observación se interpreta como una realización de
+una variable aleatoria funcional.</p>
+<p>Formalmente, sea <span class="math inline"><em>X</em></span> una
+variable aleatoria con valores en un espacio funcional <span
+class="math inline"><em>H</em></span>. Una muestra de tamaño <span
+class="math inline"><em>n</em></span> se escribe como: <span
+class="math display"><em>X</em><sub>1</sub>, …, <em>X</em><sub><em>n</em></sub>,   <em>X</em><sub><em>i</em></sub> ∈ <em>H</em>.</span>
+En aplicaciones, las funciones rara vez se observan de manera continua.
+Se observan en una malla finita y, eventualmente, con ruido: <span
+class="math display"><em>Y</em><sub><em>i</em><em>j</em></sub> = <em>X</em><sub><em>i</em></sub>(<em>s</em><sub><em>i</em><em>j</em></sub>) + <em>ε</em><sub><em>i</em><em>j</em></sub>,   <em>j</em> = 1, …, <em>m</em><sub><em>i</em></sub>.</span>
+El objetivo del análisis funcional es recuperar una representación
+regularizada de <span
+class="math inline"><em>X</em><sub><em>i</em></sub></span>, estudiar su
+variabilidad y, cuando existe estructura temporal, modelar su
+evolución.</p>
+<p>En esta tesis, cada observación diaria es una superficie <span
+class="math inline"><em>Y</em><sub><em>t</em></sub>(<em>δ</em>, <em>τ</em>)</span>,
+donde <span class="math inline"><em>t</em></span> indexa la fecha, <span
+class="math inline"><em>δ</em></span> el delta y <span
+class="math inline"><em>τ</em></span> el tenor. El dominio es
+bidimensional y compacto: <span
+class="math display">𝒟 = <em>Δ</em> × 𝒯.</span> Aunque los datos se
+observan en 65 nodos, se asume que provienen de una superficie
+subyacente suficientemente regular. Esta hipótesis permite usar bases
+tensoriales y FPCA para separar variación sistemática, ruido de
+representación y dinámica temporal.</p>
+<h2 id="espacios-de-hilbert-y-geometría-l2">Espacios de Hilbert y
+geometría <span class="math inline"><em>L</em><sup>2</sup></span></h2>
+<p>Para formalizar la representación funcional se utiliza el espacio de
+Hilbert <span class="math inline"><em>L</em><sup>2</sup>(𝒟)</span>. Sea
+<span class="math inline">𝒟 ⊂ ℝ<sup>2</sup></span> compacto. Se define:
+<span
+class="math display"><em>L</em><sup>2</sup>(𝒟) = {<em>f</em> : 𝒟 → ℝ : ∫<sub>𝒟</sub><em>f</em>(<em>s</em>)<sup>2</sup> <em>d</em><em>s</em> &lt; ∞}.</span>
+El producto interno y la norma inducida son: <span
+class="math display">$$\left\langle f,g
+\right\rangle_{L^2}=\int_{\mathcal{D}} f(s)g(s)\,ds,
+  \qquad
+  \left\lVert f \right\rVert_{L^2}=\sqrt{\left\langle f,f
+\right\rangle_{L^2}}.$$</span> En el caso de superficies de volatilidad,
+<span class="math inline"><em>s</em> = (<em>δ</em>, <em>τ</em>)</span>
+y: <span
+class="math display">⟨<em>f</em>, <em>g</em>⟩<sub><em>L</em><sup>2</sup></sub> = ∫<sub><em>Δ</em></sub>∫<sub>𝒯</sub><em>f</em>(<em>δ</em>, <em>τ</em>)<em>g</em>(<em>δ</em>, <em>τ</em>) <em>d</em><em>τ</em> <em>d</em><em>δ</em>.</span></p>
+<p>Este marco es importante por cuatro razones. Primero, <span
+class="math inline"><em>L</em><sup>2</sup></span> es completo: los
+límites de sucesiones convergentes permanecen dentro del espacio.
+Segundo, la ortogonalidad está bien definida y permite proyectar
+superficies sobre subespacios de baja dimensión. Tercero, los operadores
+compactos de covarianza poseen descomposiciones espectrales, base de la
+expansión de Karhunen-Loève y de la FPCA. Cuarto, el producto interno
+define la noción correcta de distancia funcional; sin esta métrica, una
+PCA aplicada directamente a coeficientes de una base no ortonormal puede
+distorsionar la variación.</p>
+<p>La consecuencia práctica es que no basta con estimar coeficientes en
+una base. También se debe incorporar la matriz de Gram de esa base para
+que los productos internos y las componentes principales correspondan a
+la geometría funcional.</p>
+<h2 id="bases-b-spline-unidimensionales">Bases B-spline
+unidimensionales</h2>
+<p>Para representar funciones en un dominio compacto <span
+class="math inline">[<em>a</em>, <em>b</em>]</span>, se emplean bases
+B-spline por su soporte local, estabilidad numérica y flexibilidad. Sea
+<span
+class="math inline"><strong>τ</strong> = (<em>τ</em><sub>0</sub>, …, <em>τ</em><sub><em>M</em></sub>)</span>
+un vector de nodos no decreciente con <span
+class="math inline"><em>τ</em><sub>0</sub> = <em>a</em></span> y <span
+class="math inline"><em>τ</em><sub><em>M</em></sub> = <em>b</em></span>.
+Fijado un grado <span class="math inline"><em>p</em></span>, las
+B-splines se definen recursivamente por Cox-de Boor: <span
+class="math display">$$B_{k,0}(t)=
+\begin{cases}
+1, &amp; \tau_{k-1}\leq t&lt;\tau_k,\\
+0, &amp; \text{en otro caso},
+\end{cases}$$</span> <span class="math display">$$B_{k,p}(t)=
+\frac{t-\tau_{k-1}}{\tau_{k+p-1}-\tau_{k-1}}B_{k,p-1}(t)
++
+\frac{\tau_{k+p}-t}{\tau_{k+p}-\tau_k}B_{k+1,p-1}(t).$$</span> Cada
+<span
+class="math inline"><em>B</em><sub><em>k</em>, <em>p</em></sub></span>
+es un polinomio por tramos de grado <span
+class="math inline"><em>p</em></span>, con soporte local y continuidad
+controlada por la multiplicidad de los nodos. En la tesis se usan
+splines cúbicos (<span class="math inline"><em>p</em> = 3</span>), que
+equilibran suavidad y flexibilidad.</p>
+<p>Una función <span
+class="math inline"><em>f</em> ∈ <em>L</em><sup>2</sup>([<em>a</em>, <em>b</em>])</span>
+se aproxima como: <span class="math display">$$f(t)\approx
+\sum_{k=1}^{K} c_k B_{k,p}(t).$$</span> Si los datos observados son
+<span
+class="math inline"><strong>y</strong> = (<em>y</em><sub>1</sub>, …, <em>y</em><sub><em>n</em></sub>)<sup>⊤</sup></span>
+en puntos <span
+class="math inline"><em>t</em><sub>1</sub>, …, <em>t</em><sub><em>n</em></sub></span>,
+y <span class="math inline"><em>B</em></span> es la matriz de diseño con
+<span
+class="math inline"><em>B</em><sub><em>i</em><em>k</em></sub> = <em>B</em><sub><em>k</em>, <em>p</em></sub>(<em>t</em><sub><em>i</em></sub>)</span>,
+los coeficientes pueden estimarse por mínimos cuadrados: <span
+class="math display">$$\widehat{\mathbf{c}}=(B^\top B)^{-1}B^\top
+\mathbf{y}.$$</span> Para estabilizar la inversión puede añadirse una
+penalización ridge: <span
+class="math display">$$\widehat{\mathbf{c}}=(B^\top B+\lambda
+I)^{-1}B^\top \mathbf{y}.$$</span></p>
+<p>La matriz de Gram unidimensional es: <span
+class="math display"><em>G</em><sub><em>k</em><em>l</em></sub> = ∫<sub><em>a</em></sub><sup><em>b</em></sup><em>B</em><sub><em>k</em>, <em>p</em></sub>(<em>t</em>)<em>B</em><sub><em>l</em>, <em>p</em></sub>(<em>t</em>) <em>d</em><em>t</em>.</span>
+Si <span class="math inline"><em>f</em></span> y <span
+class="math inline"><em>g</em></span> tienen coeficientes <span
+class="math inline"><em>c</em><sub><em>f</em></sub></span> y <span
+class="math inline"><em>c</em><sub><em>g</em></sub></span>, entonces:
+<span
+class="math display">⟨<em>f</em>, <em>g</em>⟩<sub><em>L</em><sup>2</sup></sub> = <em>c</em><sub><em>f</em></sub><sup>⊤</sup><em>G</em><em>c</em><sub><em>g</em></sub>.</span>
+Esta identidad se generaliza directamente al caso bidimensional mediante
+productos tensoriales.</p>
+<h2 id="base-tensorial-b-spline-para-superficies">Base tensorial
+B-spline para superficies</h2>
+<p>Sea <span class="math inline"><em>Δ</em></span> el dominio de delta y
+<span class="math inline">𝒯</span> el dominio de tenor. Se fijan dos
+bases B-spline: <span
+class="math display">{<em>B</em><sub><em>i</em></sub><sup><em>δ</em></sup>(<em>δ</em>)}<sub><em>i</em> = 1</sub><sup><em>K</em><sub><em>δ</em></sub></sup>,   {<em>B</em><sub><em>j</em></sub><sup><em>τ</em></sup>(<em>τ</em>)}<sub><em>j</em> = 1</sub><sup><em>K</em><sub><em>τ</em></sub></sup>.</span>
+La base bidimensional se construye con productos: <span
+class="math display"><em>Ψ</em><sub><em>i</em><em>j</em></sub>(<em>δ</em>, <em>τ</em>) = <em>B</em><sub><em>i</em></sub><sup><em>δ</em></sup>(<em>δ</em>)<em>B</em><sub><em>j</em></sub><sup><em>τ</em></sup>(<em>τ</em>).</span>
+Cada superficie diaria se aproxima por: <span
+class="math display">$$Y_t(\delta,\tau)
+  \approx
+  \sum_{i=1}^{K_\delta}\sum_{j=1}^{K_\tau}
+  c_{t,ij}B_i^\delta(\delta)B_j^\tau(\tau).$$</span></p>
+<p>Sea <span
+class="math inline"><em>Φ</em><sub><em>δ</em></sub> ∈ ℝ<sup>5 × <em>K</em><sub><em>δ</em></sub></sup></span>
+la matriz de evaluación en los cinco deltas y <span
+class="math inline"><em>Φ</em><sub><em>τ</em></sub> ∈ ℝ<sup>13 × <em>K</em><sub><em>τ</em></sub></sup></span>
+la matriz de evaluación en los trece tenores. Si <span
+class="math inline"><em>F</em><sub><em>t</em></sub> ∈ ℝ<sup>5 × 13</sup></span>
+es la matriz diaria de volatilidades, entonces: <span
+class="math display"><em>F</em><sub><em>t</em></sub> ≈ <em>Φ</em><sub><em>δ</em></sub><em>C</em><sub><em>t</em></sub><em>Φ</em><sub><em>τ</em></sub><sup>⊤</sup>,</span>
+donde <span
+class="math inline"><em>C</em><sub><em>t</em></sub> ∈ ℝ<sup><em>K</em><sub><em>δ</em></sub> × <em>K</em><sub><em>τ</em></sub></sup></span>
+contiene los coeficientes. Vectorizando por columnas: <span
+class="math display"><em>y</em><sub><em>t</em></sub> = vec (<em>F</em><sub><em>t</em></sub>) ≈ <em>X</em><em>c</em><sub><em>t</em></sub>,   <em>X</em> = <em>Φ</em><sub><em>τ</em></sub> ⊗ <em>Φ</em><sub><em>δ</em></sub>,   <em>c</em><sub><em>t</em></sub> = vec (<em>C</em><sub><em>t</em></sub>).</span>
+Esta convención implica que <span
+class="math inline"><em>F</em><sub><em>t</em></sub></span> tiene deltas
+como filas y tenores como columnas; por tanto, <span
+class="math inline">vec (<em>F</em><sub><em>t</em></sub>)</span> apila
+primero todos los deltas del primer tenor, luego todos los deltas del
+segundo tenor, y así sucesivamente. En el código, esto corresponde a
+ordenar cada día como <code>arrange(t_anos, delta)</code>. La convención
+alternativa <span
+class="math inline">vec (<em>F</em><sub><em>t</em></sub><sup>⊤</sup>)</span>,
+que apila todos los tenores de un delta antes de pasar al siguiente,
+también es válida si se cambia simultáneamente el diseño a <span
+class="math inline"><em>X</em> = <em>Φ</em><sub><em>δ</em></sub> ⊗ <em>Φ</em><sub><em>τ</em></sub></span>
+y la métrica a <span
+class="math inline"><em>G</em> = <em>G</em><sub><em>δ</em></sub> ⊗ <em>G</em><sub><em>τ</em></sub></span>.
+Lo que no es válido es mezclar <span
+class="math inline">vec (<em>F</em><sub><em>t</em></sub><sup>⊤</sup>)</span>
+con <span
+class="math inline"><em>X</em> = <em>Φ</em><sub><em>τ</em></sub> ⊗ <em>Φ</em><sub><em>δ</em></sub></span>,
+porque en ese caso cada observación se asigna a una fila de diseño que
+corresponde a otro nodo de la malla. Un diagnóstico A/B/C confirmó esta
+equivalencia: para USD/PEN, las dos convenciones consistentes entregan
+PC1=0.740525, PC1–PC2=0.980551 y PC1–PC3=0.993705, mientras que la
+convención mezclada reproduce PC1=0.922336, consistente con el resultado
+antiguo y atribuible a un desalineamiento de vectorización.</p>
+<p>En la implementación final: <span
+class="math display"><em>K</em><sub><em>δ</em></sub> = 4,   <em>K</em><sub><em>τ</em></sub> = 8,   <em>K</em> = <em>K</em><sub><em>δ</em></sub><em>K</em><sub><em>τ</em></sub> = 32,</span>
+con splines cúbicos y penalización ridge <span
+class="math inline"><em>λ</em> = 10<sup>−6</sup></span>. Por tanto, cada
+superficie de 65 nodos se resume mediante 32 coeficientes. La estimación
+diaria es: <span
+class="math display"><em>ĉ</em><sub><em>t</em></sub> = (<em>X</em><sup>⊤</sup><em>X</em> + <em>λ</em><em>I</em>)<sup>−1</sup><em>X</em><sup>⊤</sup><em>y</em><sub><em>t</em></sub>.</span>
+La superficie ajustada en la malla original es: <span
+class="math display"><em>ŷ</em><sub><em>t</em></sub> = <em>X</em><em>ĉ</em><sub><em>t</em></sub>.</span>
+Este objeto sirve tanto para diagnósticos de ajuste como para construir
+la persistencia ajustada PA.</p>
+<h2 id="métrica-funcional-y-corrección-gram-cholesky">Métrica funcional
+y corrección Gram-Cholesky</h2>
+<p>La base tensorial no es ortonormal. La matriz de Gram bidimensional
+es: <span
+class="math display"><em>G</em> = <em>G</em><sub><em>τ</em></sub> ⊗ <em>G</em><sub><em>δ</em></sub>,</span>
+donde: <span
+class="math display">(<em>G</em><sub><em>δ</em></sub>)<sub><em>i</em><em>i</em><sup>′</sup></sub> = ∫<sub><em>Δ</em></sub><em>B</em><sub><em>i</em></sub><sup><em>δ</em></sup>(<em>δ</em>)<em>B</em><sub><em>i</em><sup>′</sup></sub><sup><em>δ</em></sup>(<em>δ</em>) <em>d</em><em>δ</em>,   (<em>G</em><sub><em>τ</em></sub>)<sub><em>j</em><em>j</em><sup>′</sup></sub> = ∫<sub>𝒯</sub><em>B</em><sub><em>j</em></sub><sup><em>τ</em></sup>(<em>τ</em>)<em>B</em><sub><em>j</em><sup>′</sup></sub><sup><em>τ</em></sup>(<em>τ</em>) <em>d</em><em>τ</em>.</span>
+Para dos superficies con coeficientes <span
+class="math inline"><em>c</em><sub><em>a</em></sub></span> y <span
+class="math inline"><em>c</em><sub><em>b</em></sub></span>: <span
+class="math display">⟨<em>f</em><sub><em>a</em></sub>, <em>f</em><sub><em>b</em></sub>⟩<sub><em>L</em><sup>2</sup></sub> = <em>c</em><sub><em>a</em></sub><sup>⊤</sup><em>G</em><em>c</em><sub><em>b</em></sub>.</span></p>
+<p>Si se aplicara PCA directamente sobre <span
+class="math inline"><em>c</em><sub><em>t</em></sub></span>, se usaría
+implícitamente el producto <span
+class="math inline"><em>c</em><sub><em>a</em></sub><sup>⊤</sup><em>c</em><sub><em>b</em></sub></span>,
+que no coincide con la métrica funcional. Para evitar esta distorsión,
+se usa la factorización de Cholesky: <span
+class="math display"><em>G</em> = <em>S</em><sup>⊤</sup><em>S</em>.</span>
+Con coeficientes centrados <span
+class="math inline"><em>c̃</em><sub><em>t</em></sub> = <em>ĉ</em><sub><em>t</em></sub> − <em>c̄</em></span>,
+se define: <span
+class="math display"><em>u</em><sub><em>t</em></sub> = <em>S</em><em>c̃</em><sub><em>t</em></sub>.</span>
+Entonces: <span
+class="math display">∥<em>f</em><sub><em>t</em></sub> − <em>f̄</em>∥<sub><em>L</em><sup>2</sup></sub><sup>2</sup> = <em>c̃</em><sub><em>t</em></sub><sup>⊤</sup><em>G</em><em>c̃</em><sub><em>t</em></sub> = <em>u</em><sub><em>t</em></sub><sup>⊤</sup><em>u</em><sub><em>t</em></sub>.</span>
+La transformación <span
+class="math inline"><em>c</em> ↦ <em>S</em><em>c</em></span> convierte
+la métrica funcional en una métrica euclidiana. Por ello, una PCA
+euclidiana sobre <span
+class="math inline"><em>u</em><sub><em>t</em></sub></span> es
+equivalente a una FPCA sobre las superficies en <span
+class="math inline"><em>L</em><sup>2</sup>(<em>Δ</em> × 𝒯)</span>.</p>
+<h2 id="fpca-sobre-superficies">FPCA sobre superficies</h2>
+<p>Sea <span class="math inline"><em>U</em></span> la matriz cuyas filas
+son los vectores <span
+class="math inline"><em>u</em><sub><em>t</em></sub></span>. La PCA
+produce autovectores <span
+class="math inline"><em>w</em><sub><em>k</em></sub></span> y autovalores
+<span class="math inline"><em>λ</em><sub><em>k</em></sub></span>. Los
+puntajes funcionales son: <span
+class="math display"><em>z</em><sub><em>t</em>, <em>k</em></sub> = <em>u</em><sub><em>t</em></sub><sup>⊤</sup><em>w</em><sub><em>k</em></sub>.</span>
+El autovector funcional en coordenadas de la base original se recupera
+como: <span
+class="math display"><em>v</em><sub><em>k</em></sub> = <em>S</em><sup>−1</sup><em>w</em><sub><em>k</em></sub>,</span>
+y cumple: <span
+class="math display"><em>v</em><sub><em>k</em></sub><sup>⊤</sup><em>G</em><em>v</em><sub><em>ℓ</em></sub> = 𝟙{<em>k</em> = <em>ℓ</em>}.</span>
+La <span class="math inline"><em>k</em></span>-ésima eigensuperficie es:
+<span
+class="math display"><em>φ</em><sub><em>k</em></sub>(<em>δ</em>, <em>τ</em>) = <em>x</em>(<em>δ</em>, <em>τ</em>)<sup>⊤</sup><em>v</em><sub><em>k</em></sub>.</span>
+Con <span class="math inline"><em>K</em><sub>0</sub></span> componentes,
+la reconstrucción de la superficie es: <span
+class="math display">$$\widehat Y_{t,K_0}(\delta,\tau)
+  =
+  \bar
+Y(\delta,\tau)+\sum_{k=1}^{K_0}z_{t,k}\varphi_k(\delta,\tau).$$</span></p>
+<p>La proporción de varianza explicada acumulada hasta <span
+class="math inline"><em>K</em><sub>0</sub></span> es: <span
+class="math display">$$FVE(K_0)=\frac{\sum_{k=1}^{K_0}\lambda_k}{\sum_{k=1}^{K}\lambda_k}.$$</span>
+En el bloque descriptivo se reportan <span
+class="math inline"><em>K</em><sub>95</sub></span> y <span
+class="math inline"><em>K</em><sub>99</sub></span>, los mínimos <span
+class="math inline"><em>K</em><sub>0</sub></span> que alcanzan 95% y 99%
+de varianza explicada. En el bloque predictivo, <span
+class="math inline"><em>K</em><sub>0</sub></span> no se fija por FVE
+global sino por tuning fuera de muestra. Esta diferencia es deliberada:
+una dimensión óptima para compresión histórica no necesariamente
+minimiza pérdida predictiva.</p>
+<h2 id="modelos-de-pronóstico">Modelos de pronóstico</h2>
+<p>El backtest compara cinco modelos para pronosticar <span
+class="math inline"><em>y</em><sub><em>t</em> + <em>h</em></sub></span>
+en horizontes <span
+class="math inline"><em>h</em> ∈ {1, 5, 10}</span>.</p>
+<h3 id="persistencia-en-malla-observada-pm">Persistencia en malla
+observada (PM)</h3>
+<p>El benchmark principal copia la última superficie observada: <span
+class="math display"><em>ŷ</em><sub><em>t</em> + <em>h</em>|<em>t</em></sub><sup><em>P</em><em>M</em></sup> = <em>y</em><sub><em>t</em></sub>.</span>
+PM no estima parámetros, no suaviza y no reconstruye. Por ello, no
+incurre en error de base ni de truncación FPCA. Es un benchmark simple,
+pero muy exigente en series altamente persistentes.</p>
+<h3 id="persistencia-de-superficie-ajustada-pa">Persistencia de
+superficie ajustada (PA)</h3>
+<p>La persistencia ajustada copia la última superficie suavizada por la
+base: <span
+class="math display"><em>ŷ</em><sub><em>t</em> + <em>h</em>|<em>t</em></sub><sup><em>P</em><em>A</em></sup> = <em>X</em><em>ĉ</em><sub><em>t</em></sub>.</span>
+PA permite separar dos efectos: la persistencia temporal y el costo de
+pasar desde la malla cruda a la representación funcional. Si PA pierde
+frente a PM, existe evidencia de que la representación suavizada elimina
+variación relevante para el RMSE de malla.</p>
+<h3 id="var1-en-puntajes">VAR(1) en puntajes</h3>
+<p>Sea <span
+class="math inline"><em>z</em><sub><em>t</em></sub> ∈ ℝ<sup><em>K</em><sub>0</sub></sup></span>
+el vector de puntajes FPCA. El modelo VAR(1) asume: <span
+class="math display"><em>z</em><sub><em>t</em> + 1</sub> = <em>a</em> + <em>B</em><em>z</em><sub><em>t</em></sub> + <em>ε</em><sub><em>t</em> + 1</sub>,   𝔼(<em>ε</em><sub><em>t</em> + 1</sub>) = 0.</span>
+La estimación se realiza por mínimos cuadrados con regularización ridge:
+<span
+class="math display">(<em>â</em>, <em>B̂</em>) = arg min<sub><em>a</em>, <em>B</em></sub>∑<sub><em>t</em></sub>∥<em>z</em><sub><em>t</em> + 1</sub> − <em>a</em> − <em>B</em><em>z</em><sub><em>t</em></sub>∥<sub>2</sub><sup>2</sup> + <em>λ</em><sub><em>V</em><em>A</em><em>R</em></sub>∥<em>B</em>∥<sub><em>F</em></sub><sup>2</sup>,</span>
+con <span
+class="math inline"><em>λ</em><sub><em>V</em><em>A</em><em>R</em></sub> = 10<sup>−2</sup></span>.
+Para horizontes mayores se itera: <span
+class="math display"><em>ẑ</em><sub><em>t</em> + <em>k</em>|<em>t</em></sub><sup><em>V</em><em>A</em><em>R</em></sup> = <em>â</em> + <em>B̂</em><em>ẑ</em><sub><em>t</em> + <em>k</em> − 1|<em>t</em></sub><sup><em>V</em><em>A</em><em>R</em></sup>.</span>
+La superficie se reconstruye desde <span
+class="math inline"><em>ẑ</em><sub><em>t</em> + <em>h</em>|<em>t</em></sub><sup><em>V</em><em>A</em><em>R</em></sup></span>
+usando la media y las eigensuperficies de la ventana de
+entrenamiento.</p>
+<h3 id="arh-en-incrementos">ARH en incrementos</h3>
+<p>El modelo ARH en incrementos preserva el nivel persistente de los
+puntajes y modela únicamente los cambios: <span
+class="math display"><em>Δ</em><em>z</em><sub><em>t</em></sub> = <em>z</em><sub><em>t</em></sub> − <em>z</em><sub><em>t</em> − 1</sub>.</span>
+Se supone: <span
+class="math display"><em>Δ</em><em>z</em><sub><em>t</em> + 1</sub> = <em>ρ</em><em>Δ</em><em>z</em><sub><em>t</em></sub> + <em>η</em><sub><em>t</em> + 1</sub>.</span>
+El operador finito-dimensional <span
+class="math inline"><em>ρ</em></span> se estima mediante un análogo
+regularizado de Yule-Walker: <span
+class="math display"><em>ρ̂</em> = <em>Ĉ</em><sub>1</sub>(<em>Ĉ</em><sub>0</sub> + <em>λ</em><sub><em>ρ</em></sub><em>I</em>)<sup>−1</sup>,</span>
+donde: <span class="math display">$$\widehat C_0=\frac{1}{T'}\sum_t
+\Delta z_t\Delta z_t^\top,
+  \qquad
+  \widehat C_1=\frac{1}{T'}\sum_t \Delta z_{t+1}\Delta
+z_t^\top,$$</span> y <span
+class="math inline"><em>λ</em><sub><em>ρ</em></sub> = 10<sup>−6</sup></span>.
+El pronóstico a horizonte <span class="math inline"><em>h</em></span>
+es: <span class="math display">$$\widehat z_{t+h|t}^{ARHinc}
+  =
+  z_t+\sum_{k=1}^{h}\widehat\rho^{\,k}\Delta z_t.$$</span> Esta
+especificación es funcionalmente interpretable como una aproximación
+truncada de un proceso ARH en un subespacio generado por las primeras
+<span class="math inline"><em>K</em><sub>0</sub></span> componentes.</p>
+<h3 id="kernelarh">KernelARH</h3>
+<p>KernelARH combina una media condicional no paramétrica en el espacio
+de puntajes con una corrección ARH(1) en residuos. Se parte de: <span
+class="math display"><em>z</em><sub><em>t</em> + 1</sub> = <em>m</em>(<em>z</em><sub><em>t</em></sub>) + <em>e</em><sub><em>t</em> + 1</sub>,   <em>e</em><sub><em>t</em> + 1</sub> = <em>ρ</em><em>e</em><sub><em>t</em></sub> + <em>u</em><sub><em>t</em> + 1</sub>.</span>
+La media condicional se estima mediante un suavizador Nadaraya-Watson:
+<span class="math display">$$\widehat m_t(z)
+  =
+  \frac{\sum_{i=1}^{t-1}K(d(z,z_i)/h)z_{i+1}}
+       {\sum_{i=1}^{t-1}K(d(z,z_i)/h)}.$$</span> El núcleo usado es
+gaussiano: <span
+class="math display"><em>K</em>(<em>u</em>) = exp (−<em>u</em><sup>2</sup>/2).</span>
+La distancia se calcula en coordenadas estandarizadas para evitar que un
+puntaje de mayor escala domine: <span
+class="math display"><em>d</em>(<em>z</em>, <em>z</em><sup>′</sup>) = ∥<em>D</em><sup>−1</sup>(<em>z</em> − <em>z</em><sup>′</sup>)∥<sub>2</sub>,   <em>D</em> = diag (<em>s</em><sub>1</sub>, …, <em>s</em><sub><em>K</em><sub>0</sub></sub>).</span>
+Los residuos estimados son: <span
+class="math display"><em>ê</em><sub><em>t</em> + 1</sub> = <em>z</em><sub><em>t</em> + 1</sub> − <em>m̂</em><sub><em>t</em></sub>(<em>z</em><sub><em>t</em></sub>),</span>
+y <span class="math inline"><em>ρ</em></span> se estima con la misma
+regularización tipo Yule-Walker usada en ARHinc. El pronóstico combina
+la media no paramétrica y la memoria residual: <span
+class="math display"><em>ẑ</em><sub><em>t</em> + 1|<em>t</em></sub><sup><em>K</em><em>e</em><em>r</em><em>n</em><em>e</em><em>l</em><em>A</em><em>R</em><em>H</em></sup> = <em>m̂</em><sub><em>t</em></sub>(<em>z</em><sub><em>t</em></sub>) + <em>ρ̂</em> <em>ê</em><sub><em>t</em></sub>.</span>
+Para horizontes mayores se itera la media condicional y la dinámica
+residual.</p>
+<h2 id="diseño-de-backtest-y-tuning">Diseño de backtest y tuning</h2>
+<p>La evaluación es estrictamente fuera de muestra y se realiza con
+ventanas móviles. Para cada par se selecciona una ventana de
+entrenamiento: <span
+class="math display"><em>W</em> ∈ {44, 66, 88, 110, 132, 154, 176, 198},</span>
+y un número de componentes: <span
+class="math display"><em>K</em><sub>0</sub> ∈ {2, …, 15}.</span> La
+selección se realiza mediante un procedimiento de tuning interno que usa
+únicamente información disponible hasta cada fecha de entrenamiento. La
+FPCA final del backtest se estima localmente en cada ventana, evitando
+filtración temporal desde observaciones futuras.</p>
+<p>La métrica principal es el RMSE en la malla observada: <span
+class="math display">$$RMSE_{t,h}^{(m)}
+  =
+  \left[
+  \frac{1}{65}\sum_{q=1}^{65}
+  \left(
+  \widehat y_{t+h|t,q}^{(m)}-y_{t+h,q}
+  \right)^2
+  \right]^{1/2}.$$</span> Para cada modelo, par y horizonte se reportan
+mediana, percentiles 25 y 75, tasa de acierto frente a PM y pruebas de
+Diebold-Mariano.</p>
+<p>La tasa de acierto frente a PM se define como: <span
+class="math display">$$TA_m(h)=
+  \frac{1}{|\mathcal{T}_{OOS}|}
+  \sum_{t\in\mathcal{T}_{OOS}}
+  \mathbb{1}\{RMSE_{t,h}^{(m)}&lt;RMSE_{t,h}^{(PM)}\}.$$</span> Las
+pruebas de Diebold-Mariano se aplican a la diferencia de pérdidas: <span
+class="math display"><em>d</em><sub><em>t</em></sub> = (<em>R</em><em>M</em><em>S</em><em>E</em><sub><em>t</em>, <em>h</em></sub><sup><em>P</em><em>M</em></sup>)<sup>2</sup> − (<em>R</em><em>M</em><em>S</em><em>E</em><sub><em>t</em>, <em>h</em></sub><sup><em>m</em></sup>)<sup>2</sup>.</span>
+Con esta convención, un estadístico DM negativo indica que el modelo
+alternativo tiene mayor pérdida que PM.</p>
+<p>Como análisis de robustez, se calculan tres pérdidas adicionales
+sobre las mismas predicciones fuera de muestra. La primera es el error
+absoluto medio: <span class="math display">$$MAE_{t,h}^{(m)}
+  =
+  \frac{1}{65}\sum_{q=1}^{65}
+  \left|
+  \widehat y_{t+h|t,q}^{(m)}-y_{t+h,q}
+  \right|.$$</span> Las otras dos son RMSE ponderados por tenor: <span
+class="math display">$$WRMSE_{t,h}^{(m)}(w)
+  =
+  \left[
+  \frac{\sum_{q=1}^{65}w_q
+  \left(
+  \widehat y_{t+h|t,q}^{(m)}-y_{t+h,q}
+  \right)^2}{\sum_{q=1}^{65}w_q}
+  \right]^{1/2}.$$</span> Para enfatizar vencimientos cortos se usa
+<span class="math inline">$w_q\propto 1/\sqrt{\tau_q}$</span>; para
+enfatizar vencimientos largos se usa <span
+class="math inline">$w_q\propto \sqrt{\tau_q}$</span>. En ambos casos
+los pesos se normalizan para tener promedio uno.</p>
+<p>Finalmente, se evalúa robustez a la resolución de la base B-spline.
+Además de la especificación principal <span
+class="math inline"><code>base_4x8</code></span>, se consideran una base
+parsimoniosa <span class="math inline"><code>coarse_4x6</code></span> y
+una base flexible <span
+class="math inline"><code>rich_5x10</code></span>. En esta prueba se
+mantiene fijo el <span
+class="math inline"><em>T</em><em>R</em><em>A</em><em>I</em><em>N</em>_<em>S</em><em>I</em><em>Z</em><em>E</em></span>
+seleccionado por la corrida principal de cada par y se reoptimiza <span
+class="math inline"><em>K</em><sub>0</sub></span> por horizonte y base.
+Esto permite distinguir si las conclusiones predictivas dependen de la
+suavidad impuesta por la base.</p>
+<h1 id="datos">Datos</h1>
+<p>La base de datos proviene de superficies diarias publicadas por
+Bloomberg para ocho pares de divisas. Luego del filtrado por superficies
+completas, cada par cuenta con 299 fechas desde el 4 de febrero de 2025
+hasta el 27 de marzo de 2026. Los pares son: <span
+class="math display">USD/PEN, USD/COP, USD/CLP, USD/BRL, USD/ARS,
+USD/MXN, EUR/USD, USD/ZAR.</span> Cada fecha contiene 65 nodos formados
+por cinco deltas y trece tenores. El archivo fuente es
+<code>vols3.xlsx</code>; la corrida final se generó con
+<code>tesis_volatilidad_analysis_final.R</code>.</p>
+<div id="tab:fpca_global">
+<table>
+<caption>Disponibilidad y varianza explicada global por par</caption>
+<thead>
+<tr>
+<th style="text-align: left;">Par</th>
+<th style="text-align: right;">Días</th>
+<th style="text-align: right;">PC1</th>
+<th style="text-align: right;">PC1–PC2</th>
+<th style="text-align: right;">PC1–PC3</th>
+<th style="text-align: right;"><span
+class="math inline"><em>K</em><sub>95</sub></span></th>
+<th style="text-align: right;"><span
+class="math inline"><em>K</em><sub>99</sub></span></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">USD/PEN</td>
+<td style="text-align: right;">299</td>
+<td style="text-align: right;">0.7405</td>
+<td style="text-align: right;">0.9805</td>
+<td style="text-align: right;">0.9937</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">3</td>
+</tr>
+<tr>
+<td style="text-align: left;">USD/COP</td>
+<td style="text-align: right;">299</td>
+<td style="text-align: right;">0.9246</td>
+<td style="text-align: right;">0.9809</td>
+<td style="text-align: right;">0.9962</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">3</td>
+</tr>
+<tr>
+<td style="text-align: left;">USD/CLP</td>
+<td style="text-align: right;">299</td>
+<td style="text-align: right;">0.9892</td>
+<td style="text-align: right;">0.9964</td>
+<td style="text-align: right;">0.9996</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">2</td>
+</tr>
+<tr>
+<td style="text-align: left;">USD/BRL</td>
+<td style="text-align: right;">299</td>
+<td style="text-align: right;">0.9877</td>
+<td style="text-align: right;">0.9962</td>
+<td style="text-align: right;">0.9986</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">2</td>
+</tr>
+<tr>
+<td style="text-align: left;">USD/ARS</td>
+<td style="text-align: right;">299</td>
+<td style="text-align: right;">0.9834</td>
+<td style="text-align: right;">0.9955</td>
+<td style="text-align: right;">0.9983</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">2</td>
+</tr>
+<tr>
+<td style="text-align: left;">USD/MXN</td>
+<td style="text-align: right;">299</td>
+<td style="text-align: right;">0.9472</td>
+<td style="text-align: right;">0.9845</td>
+<td style="text-align: right;">0.9975</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">3</td>
+</tr>
+<tr>
+<td style="text-align: left;">EUR/USD</td>
+<td style="text-align: right;">299</td>
+<td style="text-align: right;">0.9566</td>
+<td style="text-align: right;">0.9775</td>
+<td style="text-align: right;">0.9907</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">3</td>
+</tr>
+<tr>
+<td style="text-align: left;">USD/ZAR</td>
+<td style="text-align: right;">299</td>
+<td style="text-align: right;">0.9550</td>
+<td style="text-align: right;">0.9871</td>
+<td style="text-align: right;">0.9978</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">3</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>La Tabla <a href="#tab:fpca_global" data-reference-type="ref"
+data-reference="tab:fpca_global">1</a> resume el resultado descriptivo
+central. En todos los pares, la primera componente explica al menos
+74.05% de la varianza funcional; en seis pares supera 94%. Dos
+componentes explican entre 97.75% y 99.64%, y tres componentes explican
+entre 99.07% y 99.96%. Esto confirma que las superficies de volatilidad
+implícita poseen una estructura funcional de baja dimensión.</p>
+<p>La calidad de ajuste B-spline también varía por par. La mediana del
+RMSE de ajuste diario es 0.9164 puntos porcentuales para USD/PEN, 0.6023
+para USD/COP, 0.5792 para USD/CLP, 0.6297 para USD/BRL, 1.2879 para
+USD/ARS, 0.5956 para USD/MXN, 0.3952 para EUR/USD y 0.5525 para USD/ZAR.
+Este punto es importante para la interpretación predictiva: PM opera
+directamente sobre la malla observada, mientras que PA y los modelos
+dinámicos pasan por una representación suavizada y reconstruida.</p>
+<h1 id="resultados-descriptivos">Resultados descriptivos</h1>
+<p>La FPCA global permite interpretar la variación de las superficies.
+En USD/PEN, la primera componente captura principalmente desplazamientos
+de nivel de la superficie; la segunda recoge variación de pendiente o
+curvatura en la interacción delta-tenor; la tercera aporta ajustes más
+locales. La suma de PC1 y PC2 explica 98.05%, lo que muestra que la
+mayor parte de la variación histórica puede resumirse con dos factores
+funcionales.</p>
+<figure id="fig:surface_fit" data-latex-placement="H">
+
+<figcaption>Ejemplo de superficie ajustada por base B-spline tensorial
+para USD/PEN.</figcaption>
+</figure>
+<figure id="fig:pc1" data-latex-placement="H">
+
+<figcaption>Primera eigensuperficie FPCA para USD/PEN.</figcaption>
+</figure>
+<p>El resultado descriptivo no depende únicamente de USD/PEN. Para
+USD/CLP, USD/BRL y USD/ARS, una sola componente supera 98% de varianza
+explicada. Para USD/COP, USD/MXN, EUR/USD y USD/ZAR, una o dos
+componentes bastan para superar 95%. La tesis, por tanto, conserva un
+aporte funcional claro: las superficies cambiarias observadas en la
+muestra son altamente compresibles e interpretables mediante FPCA.</p>
+<h2 id="dinámica-de-puntajes-fpca">Dinámica de puntajes FPCA</h2>
+<p>La varianza explicada resume la importancia de cada componente, pero
+los puntajes FPCA permiten estudiar cómo evolucionan los factores en el
+tiempo. Para facilitar la comparación entre pares, los signos de las
+componentes se orientan de modo que un aumento de un desvío estándar del
+puntaje produzca, en promedio, un desplazamiento positivo de la
+superficie reconstruida. Esta convención solo fija el signo, que en FPCA
+es arbitrario, y no altera la varianza explicada ni la
+autocorrelación.</p>
+<figure id="fig:fpca_scores_all" data-latex-placement="H">
+
+<figcaption>Puntajes FPCA estandarizados de las tres primeras
+componentes por par.</figcaption>
+</figure>
+<div id="tab:fpca_scores">
+<table>
+<caption>Dinámica de puntajes FPCA globales</caption>
+<thead>
+<tr>
+<th style="text-align: left;">Par</th>
+<th style="text-align: right;">FVE1</th>
+<th style="text-align: right;">FVE2</th>
+<th style="text-align: right;">FVE3</th>
+<th style="text-align: right;"><span
+class="math inline"><em>ρ</em><sub>1</sub></span>(PC1)</th>
+<th style="text-align: right;"><span
+class="math inline"><em>ρ</em><sub>1</sub></span>(PC2)</th>
+<th style="text-align: right;"><span
+class="math inline"><em>Δ</em></span>PC1/sd</th>
+<th style="text-align: right;"><span
+class="math inline"><em>Δ</em></span>PC2/sd</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">USD/PEN</td>
+<td style="text-align: right;">0.741</td>
+<td style="text-align: right;">0.240</td>
+<td style="text-align: right;">0.013</td>
+<td style="text-align: right;">0.834</td>
+<td style="text-align: right;">0.915</td>
+<td style="text-align: right;">-3.79</td>
+<td style="text-align: right;">2.31</td>
+</tr>
+<tr>
+<td style="text-align: left;">USD/COP</td>
+<td style="text-align: right;">0.925</td>
+<td style="text-align: right;">0.056</td>
+<td style="text-align: right;">0.015</td>
+<td style="text-align: right;">0.868</td>
+<td style="text-align: right;">0.968</td>
+<td style="text-align: right;">-3.51</td>
+<td style="text-align: right;">1.60</td>
+</tr>
+<tr>
+<td style="text-align: left;">USD/CLP</td>
+<td style="text-align: right;">0.989</td>
+<td style="text-align: right;">0.007</td>
+<td style="text-align: right;">0.003</td>
+<td style="text-align: right;">0.933</td>
+<td style="text-align: right;">0.979</td>
+<td style="text-align: right;">0.91</td>
+<td style="text-align: right;">-1.55</td>
+</tr>
+<tr>
+<td style="text-align: left;">USD/BRL</td>
+<td style="text-align: right;">0.988</td>
+<td style="text-align: right;">0.008</td>
+<td style="text-align: right;">0.002</td>
+<td style="text-align: right;">0.941</td>
+<td style="text-align: right;">0.759</td>
+<td style="text-align: right;">1.37</td>
+<td style="text-align: right;">2.72</td>
+</tr>
+<tr>
+<td style="text-align: left;">USD/ARS</td>
+<td style="text-align: right;">0.983</td>
+<td style="text-align: right;">0.012</td>
+<td style="text-align: right;">0.003</td>
+<td style="text-align: right;">0.986</td>
+<td style="text-align: right;">0.897</td>
+<td style="text-align: right;">1.76</td>
+<td style="text-align: right;">0.29</td>
+</tr>
+<tr>
+<td style="text-align: left;">USD/MXN</td>
+<td style="text-align: right;">0.947</td>
+<td style="text-align: right;">0.037</td>
+<td style="text-align: right;">0.013</td>
+<td style="text-align: right;">0.864</td>
+<td style="text-align: right;">0.977</td>
+<td style="text-align: right;">-0.21</td>
+<td style="text-align: right;">-3.03</td>
+</tr>
+<tr>
+<td style="text-align: left;">EUR/USD</td>
+<td style="text-align: right;">0.957</td>
+<td style="text-align: right;">0.021</td>
+<td style="text-align: right;">0.013</td>
+<td style="text-align: right;">0.826</td>
+<td style="text-align: right;">0.801</td>
+<td style="text-align: right;">0.47</td>
+<td style="text-align: right;">-1.08</td>
+</tr>
+<tr>
+<td style="text-align: left;">USD/ZAR</td>
+<td style="text-align: right;">0.955</td>
+<td style="text-align: right;">0.032</td>
+<td style="text-align: right;">0.011</td>
+<td style="text-align: right;">0.903</td>
+<td style="text-align: right;">0.963</td>
+<td style="text-align: right;">2.73</td>
+<td style="text-align: right;">-0.84</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>La Tabla <a href="#tab:fpca_scores" data-reference-type="ref"
+data-reference="tab:fpca_scores">2</a> muestra que los puntajes son
+persistentes. La autocorrelación de primer orden de PC1 se ubica entre
+0.826 y 0.986, y la de PC2 alcanza valores superiores a 0.96 en USD/COP,
+USD/CLP, USD/MXN y USD/ZAR. Por tanto, la ausencia de mejora predictiva
+no se debe a que los factores carezcan de memoria temporal. El problema
+es más específico: la memoria de los puntajes, al ser proyectada,
+truncada y reconstruida, no reduce el error frente a copiar la malla
+observada.</p>
+<p>Los pares también difieren en el tipo de dinámica latente. USD/PEN es
+el caso más bifactorial: PC1 explica 74.1% y PC2 24.0%, con
+desplazamientos netos de -3.79 y 2.31 desvíos estándar, respectivamente.
+Esto indica una rotación importante entre dos factores funcionales, no
+solo un cambio de nivel. USD/COP también tiene una PC2 persistente,
+aunque su peso de varianza es menor. USD/CLP, USD/BRL y USD/ARS son más
+unifactoriales: PC1 explica entre 98.3% y 98.9%, por lo que la dinámica
+global se concentra en un factor de nivel dominante. USD/MXN, EUR/USD y
+USD/ZAR se ubican en una zona intermedia, con PC1 cercana a 95% y
+componentes secundarias persistentes que capturan cambios de forma.</p>
+<h2 id="fpca-rolling-como-diagnóstico-de-cambios-de-régimen">FPCA
+rolling como diagnóstico de cambios de régimen</h2>
+<p>La FPCA global resume la variación de toda la muestra, pero puede
+mezclar estados locales distintos. Para evaluar esta posibilidad, se
+recalcula la FPCA en ventanas móviles de 22, 44, 66, 88, 110 y 132 días
+hábiles, equivalentes aproximadamente a uno a seis meses. Este
+diagnóstico es descriptivo: no usa observaciones futuras para el
+backtest y no modifica la comparación predictiva. Su objetivo es medir
+si la baja dimensión funcional se mantiene localmente y si las
+direcciones principales locales se alejan del subespacio global.</p>
+<div id="tab:rolling_fpca">
+<table>
+<caption>FPCA rolling: varianza explicada local y distancia al
+subespacio global</caption>
+<thead>
+<tr>
+<th style="text-align: left;">Par</th>
+<th style="text-align: right;">PC1 22d</th>
+<th style="text-align: right;">PC1 66d</th>
+<th style="text-align: right;">PC1 132d</th>
+<th style="text-align: right;">P05 PC1 22d</th>
+<th style="text-align: right;">P05 PC1 132d</th>
+<th style="text-align: right;"><span
+class="math inline"><em>K</em><sub>95</sub></span> 132d</th>
+<th style="text-align: right;">Dist. 132d</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">USD/PEN</td>
+<td style="text-align: right;">0.929</td>
+<td style="text-align: right;">0.895</td>
+<td style="text-align: right;">0.897</td>
+<td style="text-align: right;">0.669</td>
+<td style="text-align: right;">0.767</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">0.807</td>
+</tr>
+<tr>
+<td style="text-align: left;">USD/COP</td>
+<td style="text-align: right;">0.976</td>
+<td style="text-align: right;">0.947</td>
+<td style="text-align: right;">0.915</td>
+<td style="text-align: right;">0.903</td>
+<td style="text-align: right;">0.858</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">0.350</td>
+</tr>
+<tr>
+<td style="text-align: left;">USD/CLP</td>
+<td style="text-align: right;">0.996</td>
+<td style="text-align: right;">0.996</td>
+<td style="text-align: right;">0.994</td>
+<td style="text-align: right;">0.977</td>
+<td style="text-align: right;">0.991</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">0.301</td>
+</tr>
+<tr>
+<td style="text-align: left;">USD/BRL</td>
+<td style="text-align: right;">0.983</td>
+<td style="text-align: right;">0.978</td>
+<td style="text-align: right;">0.975</td>
+<td style="text-align: right;">0.942</td>
+<td style="text-align: right;">0.965</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">0.715</td>
+</tr>
+<tr>
+<td style="text-align: left;">USD/ARS</td>
+<td style="text-align: right;">0.960</td>
+<td style="text-align: right;">0.930</td>
+<td style="text-align: right;">0.959</td>
+<td style="text-align: right;">0.610</td>
+<td style="text-align: right;">0.575</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">0.817</td>
+</tr>
+<tr>
+<td style="text-align: left;">USD/MXN</td>
+<td style="text-align: right;">0.975</td>
+<td style="text-align: right;">0.962</td>
+<td style="text-align: right;">0.960</td>
+<td style="text-align: right;">0.924</td>
+<td style="text-align: right;">0.930</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">0.458</td>
+</tr>
+<tr>
+<td style="text-align: left;">EUR/USD</td>
+<td style="text-align: right;">0.976</td>
+<td style="text-align: right;">0.970</td>
+<td style="text-align: right;">0.963</td>
+<td style="text-align: right;">0.784</td>
+<td style="text-align: right;">0.902</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">0.452</td>
+</tr>
+<tr>
+<td style="text-align: left;">USD/ZAR</td>
+<td style="text-align: right;">0.981</td>
+<td style="text-align: right;">0.982</td>
+<td style="text-align: right;">0.955</td>
+<td style="text-align: right;">0.918</td>
+<td style="text-align: right;">0.916</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">0.301</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>La Tabla <a href="#tab:rolling_fpca" data-reference-type="ref"
+data-reference="tab:rolling_fpca">3</a> muestra tres patrones. Primero,
+la baja dimensión es localmente robusta: incluso en ventanas cortas, la
+mediana de PC1 suele ser elevada y <span
+class="math inline"><em>K</em><sub>95</sub></span> a seis meses es uno o
+dos componentes. Segundo, USD/PEN y USD/ARS presentan mayor evidencia de
+cambios de régimen. En USD/PEN, PC1 global explica solo 74.05%, pero PC1
+rolling se ubica cerca de 90%; esto sugiere que cada subperiodo es
+relativamente simple, aunque el eje dominante cambia a lo largo del
+tiempo. En USD/ARS, el percentil 5 de PC1 cae hasta 0.575 en ventanas de
+132 días, señal de episodios donde la superficie deja de comportarse
+como un sistema unifactorial. Tercero, USD/CLP es el caso más estable:
+PC1 rolling permanece alrededor de 99% y <span
+class="math inline"><em>K</em><sub>95</sub> = 1</span> a seis meses.</p>
+<p>Este diagnóstico refuerza la lectura descriptiva de la tesis. La FPCA
+no solo comprime las superficies; también revela heterogeneidad temporal
+en la geometría de los factores. Sin embargo, esta evidencia no implica
+superioridad predictiva. Más bien justifica el uso de ventanas
+rolling-locales en el backtest y sugiere, como extensión futura, modelos
+con componentes o parámetros dependientes del régimen.</p>
+<h1 id="resultados-predictivos-fuera-de-muestra">Resultados predictivos
+fuera de muestra</h1>
+<h2 id="tuning-seleccionado">Tuning seleccionado</h2>
+<p>El tuning conjunto selecciona ventanas y números de componentes
+distintos por par. Esto evidencia heterogeneidad temporal y evita
+imponer una misma ventana a todos los mercados. La Tabla <a
+href="#tab:tuning" data-reference-type="ref"
+data-reference="tab:tuning">4</a> muestra la configuración final.</p>
+<div id="tab:tuning">
+<table>
+<caption>Ventana de entrenamiento y <span
+class="math inline"><em>K</em><sub>0</sub></span> seleccionados por par
+y horizonte</caption>
+<thead>
+<tr>
+<th style="text-align: left;">Par</th>
+<th style="text-align: right;"><span
+class="math inline"><em>T</em><em>R</em><em>A</em><em>I</em><em>N</em>_<em>S</em><em>I</em><em>Z</em><em>E</em></span></th>
+<th style="text-align: right;"><span
+class="math inline"><em>K</em><sub>0</sub>(<em>h</em> = 1)</span></th>
+<th style="text-align: right;"><span
+class="math inline"><em>K</em><sub>0</sub>(<em>h</em> = 5)</span></th>
+<th style="text-align: right;"><span
+class="math inline"><em>K</em><sub>0</sub>(<em>h</em> = 10)</span></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">USD/PEN</td>
+<td style="text-align: right;">44</td>
+<td style="text-align: right;">4</td>
+<td style="text-align: right;">4</td>
+<td style="text-align: right;">4</td>
+</tr>
+<tr>
+<td style="text-align: left;">USD/COP</td>
+<td style="text-align: right;">154</td>
+<td style="text-align: right;">7</td>
+<td style="text-align: right;">8</td>
+<td style="text-align: right;">8</td>
+</tr>
+<tr>
+<td style="text-align: left;">USD/CLP</td>
+<td style="text-align: right;">88</td>
+<td style="text-align: right;">7</td>
+<td style="text-align: right;">6</td>
+<td style="text-align: right;">7</td>
+</tr>
+<tr>
+<td style="text-align: left;">USD/BRL</td>
+<td style="text-align: right;">132</td>
+<td style="text-align: right;">7</td>
+<td style="text-align: right;">6</td>
+<td style="text-align: right;">5</td>
+</tr>
+<tr>
+<td style="text-align: left;">USD/ARS</td>
+<td style="text-align: right;">110</td>
+<td style="text-align: right;">8</td>
+<td style="text-align: right;">7</td>
+<td style="text-align: right;">5</td>
+</tr>
+<tr>
+<td style="text-align: left;">USD/MXN</td>
+<td style="text-align: right;">88</td>
+<td style="text-align: right;">7</td>
+<td style="text-align: right;">6</td>
+<td style="text-align: right;">6</td>
+</tr>
+<tr>
+<td style="text-align: left;">EUR/USD</td>
+<td style="text-align: right;">110</td>
+<td style="text-align: right;">8</td>
+<td style="text-align: right;">8</td>
+<td style="text-align: right;">6</td>
+</tr>
+<tr>
+<td style="text-align: left;">USD/ZAR</td>
+<td style="text-align: right;">66</td>
+<td style="text-align: right;">5</td>
+<td style="text-align: right;">4</td>
+<td style="text-align: right;">3</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>El hecho de que el <span
+class="math inline"><em>K</em><sub>0</sub></span> predictivo sea mayor
+que el <span class="math inline"><em>K</em><sub>0</sub></span>
+descriptivo de 95% o 99% en varios pares no contradice el resultado de
+baja dimensión. El <span
+class="math inline"><em>K</em><sub>0</sub></span> global mide varianza
+explicada histórica; el <span
+class="math inline"><em>K</em><sub>0</sub></span> del backtest se
+selecciona localmente para minimizar un criterio predictivo. Aun así,
+los diagnósticos rolling muestran que los subespacios locales retienen
+casi toda la varianza: la FVE mediana por ventana se mantiene cerca de
+uno en los pares y horizontes evaluados.</p>
+<h2 id="rmse-mediano-por-par-y-horizonte">RMSE mediano por par y
+horizonte</h2>
+<p>La Tabla <a href="#tab:rmse_best" data-reference-type="ref"
+data-reference="tab:rmse_best">5</a> resume el hallazgo predictivo
+principal. En cada par y horizonte se reporta el RMSE mediano de PM y el
+mejor RMSE mediano entre las alternativas no PM. En los 24 casos, PM
+presenta menor RMSE mediano.</p>
+<div id="tab:rmse_best">
+<table>
+<caption>RMSE mediano: PM frente a la mejor alternativa no PM</caption>
+<thead>
+<tr>
+<th style="text-align: left;">Par</th>
+<th style="text-align: left;"><span
+class="math inline"><em>h</em></span></th>
+<th style="text-align: right;">PM</th>
+<th style="text-align: right;">Mejor alt.</th>
+<th style="text-align: right;">Brecha</th>
+<th style="text-align: left;">Modelo alt.</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">Par</td>
+<td style="text-align: left;"><span
+class="math inline"><em>h</em></span></td>
+<td style="text-align: right;">PM</td>
+<td style="text-align: right;">Mejor alt.</td>
+<td style="text-align: right;">Brecha</td>
+<td style="text-align: left;">Modelo alt.</td>
+</tr>
+<tr>
+<td style="text-align: left;">USD/PEN</td>
+<td style="text-align: left;">1</td>
+<td style="text-align: right;">0.1200</td>
+<td style="text-align: right;">0.9670</td>
+<td style="text-align: right;">0.8470</td>
+<td style="text-align: left;">PA</td>
+</tr>
+<tr>
+<td style="text-align: left;">USD/PEN</td>
+<td style="text-align: left;">5</td>
+<td style="text-align: right;">0.3227</td>
+<td style="text-align: right;">0.9998</td>
+<td style="text-align: right;">0.6771</td>
+<td style="text-align: left;">ARHinc</td>
+</tr>
+<tr>
+<td style="text-align: left;">USD/PEN</td>
+<td style="text-align: left;">10</td>
+<td style="text-align: right;">0.4223</td>
+<td style="text-align: right;">1.0394</td>
+<td style="text-align: right;">0.6171</td>
+<td style="text-align: left;">PA</td>
+</tr>
+<tr>
+<td style="text-align: left;">USD/COP</td>
+<td style="text-align: left;">1</td>
+<td style="text-align: right;">0.1504</td>
+<td style="text-align: right;">0.5356</td>
+<td style="text-align: right;">0.3852</td>
+<td style="text-align: left;">PA</td>
+</tr>
+<tr>
+<td style="text-align: left;">USD/COP</td>
+<td style="text-align: left;">5</td>
+<td style="text-align: right;">0.4321</td>
+<td style="text-align: right;">0.6613</td>
+<td style="text-align: right;">0.2292</td>
+<td style="text-align: left;">PA</td>
+</tr>
+<tr>
+<td style="text-align: left;">USD/COP</td>
+<td style="text-align: left;">10</td>
+<td style="text-align: right;">0.6441</td>
+<td style="text-align: right;">0.8070</td>
+<td style="text-align: right;">0.1629</td>
+<td style="text-align: left;">ARHinc</td>
+</tr>
+<tr>
+<td style="text-align: left;">USD/CLP</td>
+<td style="text-align: left;">1</td>
+<td style="text-align: right;">0.1614</td>
+<td style="text-align: right;">0.6272</td>
+<td style="text-align: right;">0.4658</td>
+<td style="text-align: left;">PA</td>
+</tr>
+<tr>
+<td style="text-align: left;">USD/CLP</td>
+<td style="text-align: left;">5</td>
+<td style="text-align: right;">0.4087</td>
+<td style="text-align: right;">0.7015</td>
+<td style="text-align: right;">0.2928</td>
+<td style="text-align: left;">PA</td>
+</tr>
+<tr>
+<td style="text-align: left;">USD/CLP</td>
+<td style="text-align: left;">10</td>
+<td style="text-align: right;">0.6239</td>
+<td style="text-align: right;">0.8122</td>
+<td style="text-align: right;">0.1883</td>
+<td style="text-align: left;">KernelARH</td>
+</tr>
+<tr>
+<td style="text-align: left;">USD/BRL</td>
+<td style="text-align: left;">1</td>
+<td style="text-align: right;">0.1972</td>
+<td style="text-align: right;">0.6654</td>
+<td style="text-align: right;">0.4682</td>
+<td style="text-align: left;">PA</td>
+</tr>
+<tr>
+<td style="text-align: left;">USD/BRL</td>
+<td style="text-align: left;">5</td>
+<td style="text-align: right;">0.5848</td>
+<td style="text-align: right;">0.8287</td>
+<td style="text-align: right;">0.2439</td>
+<td style="text-align: left;">ARHinc</td>
+</tr>
+<tr>
+<td style="text-align: left;">USD/BRL</td>
+<td style="text-align: left;">10</td>
+<td style="text-align: right;">0.7676</td>
+<td style="text-align: right;">0.9835</td>
+<td style="text-align: right;">0.2159</td>
+<td style="text-align: left;">PA</td>
+</tr>
+<tr>
+<td style="text-align: left;">USD/ARS</td>
+<td style="text-align: left;">1</td>
+<td style="text-align: right;">0.1729</td>
+<td style="text-align: right;">1.2766</td>
+<td style="text-align: right;">1.1037</td>
+<td style="text-align: left;">PA</td>
+</tr>
+<tr>
+<td style="text-align: left;">USD/ARS</td>
+<td style="text-align: left;">5</td>
+<td style="text-align: right;">0.4415</td>
+<td style="text-align: right;">1.3542</td>
+<td style="text-align: right;">0.9127</td>
+<td style="text-align: left;">PA</td>
+</tr>
+<tr>
+<td style="text-align: left;">USD/ARS</td>
+<td style="text-align: left;">10</td>
+<td style="text-align: right;">0.6258</td>
+<td style="text-align: right;">1.4207</td>
+<td style="text-align: right;">0.7949</td>
+<td style="text-align: left;">PA</td>
+</tr>
+<tr>
+<td style="text-align: left;">USD/MXN</td>
+<td style="text-align: left;">1</td>
+<td style="text-align: right;">0.1470</td>
+<td style="text-align: right;">0.6072</td>
+<td style="text-align: right;">0.4602</td>
+<td style="text-align: left;">PA</td>
+</tr>
+<tr>
+<td style="text-align: left;">USD/MXN</td>
+<td style="text-align: left;">5</td>
+<td style="text-align: right;">0.3419</td>
+<td style="text-align: right;">0.6646</td>
+<td style="text-align: right;">0.3227</td>
+<td style="text-align: left;">PA</td>
+</tr>
+<tr>
+<td style="text-align: left;">USD/MXN</td>
+<td style="text-align: left;">10</td>
+<td style="text-align: right;">0.4251</td>
+<td style="text-align: right;">0.6899</td>
+<td style="text-align: right;">0.2648</td>
+<td style="text-align: left;">PA</td>
+</tr>
+<tr>
+<td style="text-align: left;">EUR/USD</td>
+<td style="text-align: left;">1</td>
+<td style="text-align: right;">0.1588</td>
+<td style="text-align: right;">0.4205</td>
+<td style="text-align: right;">0.2617</td>
+<td style="text-align: left;">PA</td>
+</tr>
+<tr>
+<td style="text-align: left;">EUR/USD</td>
+<td style="text-align: left;">5</td>
+<td style="text-align: right;">0.3741</td>
+<td style="text-align: right;">0.5367</td>
+<td style="text-align: right;">0.1626</td>
+<td style="text-align: left;">PA</td>
+</tr>
+<tr>
+<td style="text-align: left;">EUR/USD</td>
+<td style="text-align: left;">10</td>
+<td style="text-align: right;">0.4908</td>
+<td style="text-align: right;">0.5982</td>
+<td style="text-align: right;">0.1074</td>
+<td style="text-align: left;">PA</td>
+</tr>
+<tr>
+<td style="text-align: left;">USD/ZAR</td>
+<td style="text-align: left;">1</td>
+<td style="text-align: right;">0.1750</td>
+<td style="text-align: right;">0.6052</td>
+<td style="text-align: right;">0.4302</td>
+<td style="text-align: left;">PA</td>
+</tr>
+<tr>
+<td style="text-align: left;">USD/ZAR</td>
+<td style="text-align: left;">5</td>
+<td style="text-align: right;">0.4172</td>
+<td style="text-align: right;">0.7071</td>
+<td style="text-align: right;">0.2899</td>
+<td style="text-align: left;">ARHinc</td>
+</tr>
+<tr>
+<td style="text-align: left;">USD/ZAR</td>
+<td style="text-align: left;">10</td>
+<td style="text-align: right;">0.5551</td>
+<td style="text-align: right;">0.7759</td>
+<td style="text-align: right;">0.2208</td>
+<td style="text-align: left;">ARHinc</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>Este resultado rechaza la hipótesis predictiva H2. La conclusión no
+es que la representación funcional carezca de valor, sino que, bajo RMSE
+sobre la malla cruda, el beneficio potencial de modelar puntajes FPCA no
+compensa el costo de suavizado, truncación y estimación dinámica frente
+a PM.</p>
+<h2 id="detalle-usdpen">Detalle USD/PEN</h2>
+<p>USD/PEN es el par de mayor interés aplicado para la tesis. En la
+corrida final se selecciona <span
+class="math inline"><em>T</em><em>R</em><em>A</em><em>I</em><em>N</em>_<em>S</em><em>I</em><em>Z</em><em>E</em> = 44</span>
+y <span class="math inline"><em>K</em><sub>0</sub> = 4</span> para los
+tres horizontes, con 245 predicciones fuera de muestra por horizonte. La
+Tabla <a href="#tab:usdpen_rmse" data-reference-type="ref"
+data-reference="tab:usdpen_rmse">6</a> muestra los resultados
+completos.</p>
+<div id="tab:usdpen_rmse">
+<table>
+<caption>USD/PEN: RMSE mediano OOS por modelo</caption>
+<thead>
+<tr>
+<th style="text-align: left;"><span
+class="math inline"><em>h</em></span></th>
+<th style="text-align: left;">Modelo</th>
+<th style="text-align: right;">Mediana</th>
+<th style="text-align: right;">P25</th>
+<th style="text-align: right;">P75</th>
+<th style="text-align: right;"><span
+class="math inline"><em>p</em></span>-valor DM</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">1</td>
+<td style="text-align: left;">PM</td>
+<td style="text-align: right;">0.1200</td>
+<td style="text-align: right;">0.0736</td>
+<td style="text-align: right;">0.2274</td>
+<td style="text-align: right;">–</td>
+</tr>
+<tr>
+<td style="text-align: left;">1</td>
+<td style="text-align: left;">PA</td>
+<td style="text-align: right;">0.9670</td>
+<td style="text-align: right;">0.9027</td>
+<td style="text-align: right;">1.0483</td>
+<td style="text-align: right;">0.0000</td>
+</tr>
+<tr>
+<td style="text-align: left;">1</td>
+<td style="text-align: left;">VAR1</td>
+<td style="text-align: right;">7.5540</td>
+<td style="text-align: right;">3.1547</td>
+<td style="text-align: right;">15.3386</td>
+<td style="text-align: right;">0.0000</td>
+</tr>
+<tr>
+<td style="text-align: left;">1</td>
+<td style="text-align: left;">ARHinc</td>
+<td style="text-align: right;">0.9679</td>
+<td style="text-align: right;">0.9023</td>
+<td style="text-align: right;">1.0489</td>
+<td style="text-align: right;">0.0000</td>
+</tr>
+<tr>
+<td style="text-align: left;">1</td>
+<td style="text-align: left;">KernelARH</td>
+<td style="text-align: right;">0.9727</td>
+<td style="text-align: right;">0.9035</td>
+<td style="text-align: right;">1.0617</td>
+<td style="text-align: right;">0.0000</td>
+</tr>
+<tr>
+<td style="text-align: left;">5</td>
+<td style="text-align: left;">PM</td>
+<td style="text-align: right;">0.3227</td>
+<td style="text-align: right;">0.1930</td>
+<td style="text-align: right;">0.5221</td>
+<td style="text-align: right;">–</td>
+</tr>
+<tr>
+<td style="text-align: left;">5</td>
+<td style="text-align: left;">PA</td>
+<td style="text-align: right;">1.0014</td>
+<td style="text-align: right;">0.9320</td>
+<td style="text-align: right;">1.0962</td>
+<td style="text-align: right;">0.0000</td>
+</tr>
+<tr>
+<td style="text-align: left;">5</td>
+<td style="text-align: left;">VAR1</td>
+<td style="text-align: right;">10.8560</td>
+<td style="text-align: right;">4.5433</td>
+<td style="text-align: right;">27.0935</td>
+<td style="text-align: right;">0.0242</td>
+</tr>
+<tr>
+<td style="text-align: left;">5</td>
+<td style="text-align: left;">ARHinc</td>
+<td style="text-align: right;">0.9998</td>
+<td style="text-align: right;">0.9309</td>
+<td style="text-align: right;">1.0930</td>
+<td style="text-align: right;">0.0000</td>
+</tr>
+<tr>
+<td style="text-align: left;">5</td>
+<td style="text-align: left;">KernelARH</td>
+<td style="text-align: right;">1.0076</td>
+<td style="text-align: right;">0.9218</td>
+<td style="text-align: right;">1.1194</td>
+<td style="text-align: right;">0.0000</td>
+</tr>
+<tr>
+<td style="text-align: left;">10</td>
+<td style="text-align: left;">PM</td>
+<td style="text-align: right;">0.4223</td>
+<td style="text-align: right;">0.2703</td>
+<td style="text-align: right;">0.6606</td>
+<td style="text-align: right;">–</td>
+</tr>
+<tr>
+<td style="text-align: left;">10</td>
+<td style="text-align: left;">PA</td>
+<td style="text-align: right;">1.0394</td>
+<td style="text-align: right;">0.9503</td>
+<td style="text-align: right;">1.1695</td>
+<td style="text-align: right;">0.0000</td>
+</tr>
+<tr>
+<td style="text-align: left;">10</td>
+<td style="text-align: left;">VAR1</td>
+<td style="text-align: right;">8.9306</td>
+<td style="text-align: right;">3.8355</td>
+<td style="text-align: right;">23.4599</td>
+<td style="text-align: right;">0.0344</td>
+</tr>
+<tr>
+<td style="text-align: left;">10</td>
+<td style="text-align: left;">ARHinc</td>
+<td style="text-align: right;">1.0430</td>
+<td style="text-align: right;">0.9470</td>
+<td style="text-align: right;">1.1680</td>
+<td style="text-align: right;">0.0000</td>
+</tr>
+<tr>
+<td style="text-align: left;">10</td>
+<td style="text-align: left;">KernelARH</td>
+<td style="text-align: right;">1.0566</td>
+<td style="text-align: right;">0.9563</td>
+<td style="text-align: right;">1.1854</td>
+<td style="text-align: right;">0.0000</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>Los signos de las pruebas de Diebold-Mariano son negativos porque el
+diferencial se define como pérdida de PM menos pérdida del modelo
+alternativo. En USD/PEN, todos los modelos no PM son estadísticamente
+inferiores a PM en los tres horizontes. Además, las tasas de acierto
+frente a PM son prácticamente nulas: PA, VAR1 y ARHinc no superan a PM
+en ninguna fecha fuera de muestra; KernelARH solo alcanza 0.8% en <span
+class="math inline"><em>h</em> = 5</span> y 0.4% en <span
+class="math inline"><em>h</em> = 10</span>.</p>
+<figure id="fig:usdpen_box" data-latex-placement="H">
+
+<figcaption>USD/PEN: distribución de errores OOS por modelo y
+horizonte.</figcaption>
+</figure>
+<h2 id="tasas-de-acierto-y-pruebas-dm">Tasas de acierto y pruebas
+DM</h2>
+<p>Las tasas de acierto confirman que las alternativas rara vez superan
+a PM en fechas individuales. Aunque existen excepciones puntuales,
+especialmente en horizontes de 10 días para KernelARH en algunos pares,
+ninguna alternativa domina en mediana de RMSE. El mayor caso observado
+es KernelARH para USD/BRL en <span
+class="math inline"><em>h</em> = 10</span>, con una tasa de acierto de
+27.4%; aun así, su RMSE mediano es 0.9991 frente a 0.7676 de PM.</p>
+<p>En las pruebas Diebold-Mariano, 86 de las 96 comparaciones
+modelo-horizonte-par identifican inferioridad estadísticamente
+significativa de la alternativa frente a PM al 5%. En las 10
+comparaciones restantes, no hay evidencia estadística de mejora de la
+alternativa; en todas ellas la mediana de RMSE de PM sigue siendo menor.
+Por tanto, el resultado global no depende de un único par ni de una sola
+especificación dinámica.</p>
+<h2 id="robustez-por-función-de-pérdida">Robustez por función de
+pérdida</h2>
+<p>Para verificar que la conclusión no dependa únicamente del RMSE
+uniforme sobre la malla, se recalculó el desempeño con cuatro pérdidas
+medianas: RMSE, MAE, RMSE ponderado hacia vencimientos cortos y RMSE
+ponderado hacia vencimientos largos. Los pesos por tenor se normalizan
+para tener promedio uno, de modo que solo cambian la importancia
+relativa de los tramos corto y largo de la curva.</p>
+<div id="tab:loss_robustness">
+<table>
+<caption>Dominancia de PM por función de pérdida en la especificación
+principal</caption>
+<thead>
+<tr>
+<th style="text-align: left;">Pérdida</th>
+<th style="text-align: right;">Casos PM</th>
+<th style="text-align: right;">Total</th>
+<th style="text-align: right;">Proporción PM</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">MAE</td>
+<td style="text-align: right;">24</td>
+<td style="text-align: right;">24</td>
+<td style="text-align: right;">100.0%</td>
+</tr>
+<tr>
+<td style="text-align: left;">RMSE</td>
+<td style="text-align: right;">24</td>
+<td style="text-align: right;">24</td>
+<td style="text-align: right;">100.0%</td>
+</tr>
+<tr>
+<td style="text-align: left;">WRMSE largo</td>
+<td style="text-align: right;">24</td>
+<td style="text-align: right;">24</td>
+<td style="text-align: right;">100.0%</td>
+</tr>
+<tr>
+<td style="text-align: left;">WRMSE corto</td>
+<td style="text-align: right;">23</td>
+<td style="text-align: right;">24</td>
+<td style="text-align: right;">95.8%</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>La Tabla <a href="#tab:loss_robustness" data-reference-type="ref"
+data-reference="tab:loss_robustness">7</a> confirma que la dominancia de
+PM no es un artefacto de la pérdida principal. PM gana todos los casos
+bajo RMSE, MAE y ponderación hacia vencimientos largos. La única
+excepción aparece en USD/COP a <span
+class="math inline"><em>h</em> = 10</span> bajo ponderación hacia
+vencimientos cortos, donde PA obtiene una mediana de 0.930 frente a
+0.936 de PM. Esta excepción favorece una persistencia suavizada, no un
+modelo dinámico en puntajes. Por tanto, las pérdidas alternativas no
+aportan evidencia de superioridad sistemática de VAR1, ARHinc o
+KernelARH.</p>
+<h2 id="robustez-a-la-especificación-de-base-b-spline">Robustez a la
+especificación de base B-spline</h2>
+<p>Como prueba adicional, se reestimó el backtest bajo tres bases
+tensoriales: la especificación principal <span
+class="math inline"><code>base_4x8</code></span>, una base más
+parsimoniosa <span class="math inline"><code>coarse_4x6</code></span> y
+una base más flexible <span
+class="math inline"><code>rich_5x10</code></span>. En esta prueba se
+mantiene fijo el <span
+class="math inline"><em>T</em><em>R</em><em>A</em><em>I</em><em>N</em>_<em>S</em><em>I</em><em>Z</em><em>E</em></span>
+seleccionado en la corrida principal y se reoptimiza <span
+class="math inline"><em>K</em><sub>0</sub></span> por par, horizonte y
+base. El objetivo es aislar si la conclusión depende de la resolución de
+la base B-spline.</p>
+<div id="tab:basis_robustness">
+<table>
+<caption>Dominancia de PM por base y función de pérdida</caption>
+<thead>
+<tr>
+<th style="text-align: left;">Base</th>
+<th style="text-align: left;">Pérdida</th>
+<th style="text-align: right;">Casos PM</th>
+<th style="text-align: right;">Total</th>
+<th style="text-align: right;">Proporción PM</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>base_4x8</code></td>
+<td style="text-align: left;">MAE</td>
+<td style="text-align: right;">24</td>
+<td style="text-align: right;">24</td>
+<td style="text-align: right;">100.0%</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>base_4x8</code></td>
+<td style="text-align: left;">RMSE</td>
+<td style="text-align: right;">24</td>
+<td style="text-align: right;">24</td>
+<td style="text-align: right;">100.0%</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>base_4x8</code></td>
+<td style="text-align: left;">WRMSE largo</td>
+<td style="text-align: right;">24</td>
+<td style="text-align: right;">24</td>
+<td style="text-align: right;">100.0%</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>base_4x8</code></td>
+<td style="text-align: left;">WRMSE corto</td>
+<td style="text-align: right;">23</td>
+<td style="text-align: right;">24</td>
+<td style="text-align: right;">95.8%</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>coarse_4x6</code></td>
+<td style="text-align: left;">MAE</td>
+<td style="text-align: right;">24</td>
+<td style="text-align: right;">24</td>
+<td style="text-align: right;">100.0%</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>coarse_4x6</code></td>
+<td style="text-align: left;">RMSE</td>
+<td style="text-align: right;">24</td>
+<td style="text-align: right;">24</td>
+<td style="text-align: right;">100.0%</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>coarse_4x6</code></td>
+<td style="text-align: left;">WRMSE largo</td>
+<td style="text-align: right;">24</td>
+<td style="text-align: right;">24</td>
+<td style="text-align: right;">100.0%</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>coarse_4x6</code></td>
+<td style="text-align: left;">WRMSE corto</td>
+<td style="text-align: right;">23</td>
+<td style="text-align: right;">24</td>
+<td style="text-align: right;">95.8%</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>rich_5x10</code></td>
+<td style="text-align: left;">MAE</td>
+<td style="text-align: right;">23</td>
+<td style="text-align: right;">24</td>
+<td style="text-align: right;">95.8%</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>rich_5x10</code></td>
+<td style="text-align: left;">RMSE</td>
+<td style="text-align: right;">18</td>
+<td style="text-align: right;">24</td>
+<td style="text-align: right;">75.0%</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>rich_5x10</code></td>
+<td style="text-align: left;">WRMSE largo</td>
+<td style="text-align: right;">23</td>
+<td style="text-align: right;">24</td>
+<td style="text-align: right;">95.8%</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>rich_5x10</code></td>
+<td style="text-align: left;">WRMSE corto</td>
+<td style="text-align: right;">16</td>
+<td style="text-align: right;">24</td>
+<td style="text-align: right;">66.7%</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>La base principal y la base parsimoniosa entregan el mismo mensaje:
+PM domina casi todos los casos, con la misma excepción de USD/COP en
+<span class="math inline"><em>h</em> = 10</span> bajo WRMSE corto. La
+base flexible <span class="math inline"><code>rich_5x10</code></span>
+introduce más excepciones, especialmente en horizontes <span
+class="math inline"><em>h</em> = 5</span> y <span
+class="math inline"><em>h</em> = 10</span> y en pérdidas ponderadas.
+Bajo esta base, PM sigue ganando 23 de 24 casos en MAE, 23 de 24 en
+WRMSE largo y 18 de 24 en RMSE, pero cae a 16 de 24 en WRMSE corto. Las
+excepciones se concentran en PA y en algunos casos puntuales de ARHinc o
+KernelARH; no constituyen una dominancia sistemática de modelos
+dinámicos.</p>
+<p>La interpretación es que una base más flexible puede reducir el costo
+de reconstrucción de algunas alternativas en celdas específicas, sobre
+todo cuando la pérdida enfatiza vencimientos cortos. Esto matiza, pero
+no revierte, el resultado principal. La conclusión defendible no es que
+PM gane absolutamente toda variante posible, sino que PM domina la
+especificación principal, la base parsimoniosa y la mayoría de celdas
+robustas; las ganancias dinámicas que aparecen con la base rica son
+locales, dependientes de la pérdida y no generalizadas.</p>
+<h1 id="diagnósticos-de-estabilidad">Diagnósticos de estabilidad</h1>
+<p>Los diagnósticos ayudan a interpretar por qué la baja dimensión
+descriptiva no se traduce en superioridad predictiva.</p>
+<p>Primero, los subespacios FPCA locales son estables en términos de
+varianza explicada. La FVE mediana rolling se mantiene por encima de
+0.9989 en los pares y horizontes evaluados. Esto indica que el problema
+no es una incapacidad de la FPCA para representar las ventanas
+locales.</p>
+<p>Segundo, VAR1 muestra fragilidad numérica. Sus radios espectrales
+medianos están cerca de uno, entre 0.926 y 0.993 según el par y
+horizonte, y el radio espectral máximo supera uno en todos los pares. En
+USD/PEN, el radio espectral mediano es 0.926 y el máximo 1.302; los
+ratios de norma alcanzan percentiles 95 de 7.62, 18.32 y 25.06 para
+<span class="math inline"><em>h</em> = 1, 5, 10</span>, respectivamente.
+Esta cercanía a la no estacionariedad se refleja en errores medianos muy
+elevados para VAR1.</p>
+<p>Tercero, ARHinc y KernelARH son más estables que VAR1, pero su
+estabilidad no basta para superar a PM. En USD/PEN, ARHinc tiene radio
+espectral mediano 0.337, percentil 95 de 0.529 y ninguna ventana con
+radio mayor o igual a uno. KernelARH tiene radio mediano 0.682,
+percentil 95 de 0.870 y proporción de radios mayores o iguales a uno de
+0.004. Aun así, ambos modelos presentan RMSE medianos cercanos a PA y
+muy superiores a PM.</p>
+<h1 id="discusión">Discusión</h1>
+<p>El hallazgo central de la tesis es que la compresión funcional y la
+precisión predictiva no son equivalentes. Las superficies de volatilidad
+implícita de la muestra se describen muy bien con pocos factores, pero
+los modelos dinámicos sobre esos factores no reducen el RMSE de
+pronóstico frente a copiar la última superficie observada. Esta
+diferencia tiene varias explicaciones.</p>
+<p>Primero, las superficies de volatilidad son altamente persistentes.
+En horizontes cortos, una regla sin estimación puede capturar gran parte
+de la señal relevante. PM es un benchmark fuerte precisamente porque no
+intenta separar señal y ruido: reproduce la última observación
+completa.</p>
+<p>Segundo, PM no incurre en error de reconstrucción. En cambio, PA y
+los modelos dinámicos pasan por la base B-spline. Este paso suaviza la
+superficie y puede eliminar movimientos locales pequeños que sí afectan
+el RMSE punto a punto sobre la malla observada. En USD/PEN, la mediana
+del RMSE de ajuste B-spline es 0.9164 puntos porcentuales, superior al
+RMSE mediano de PM en los tres horizontes (0.1200, 0.3227 y 0.4223).
+Esta comparación ilustra por qué una representación funcional
+descriptivamente útil puede estar en desventaja bajo una métrica cruda
+de malla.</p>
+<p>Tercero, el truncamiento FPCA reduce dimensión pero también filtra
+variación. La varianza filtrada puede ser pequeña en términos
+funcionales globales y, al mismo tiempo, relevante para errores locales
+en nodos específicos. La FPCA optimiza representación de varianza
+histórica, no necesariamente pérdida de pronóstico punto a punto.</p>
+<p>Cuarto, los modelos dinámicos añaden error de estimación. VAR1 es
+particularmente vulnerable por su cercanía a raíces unitarias y por la
+inestabilidad de algunas ventanas. ARHinc y KernelARH son más estables,
+pero su mejora dinámica no compensa el costo de reconstrucción frente a
+PM.</p>
+<p>Quinto, la heterogeneidad de ventanas seleccionadas sugiere no
+estacionariedad local. USD/PEN selecciona una ventana corta de 44 días,
+mientras que USD/COP selecciona 154 días y USD/BRL 132 días. No existe
+una ventana universal que capture por igual la dinámica de todos los
+pares. Esta heterogeneidad es esperable en mercados con distinta
+microestructura, liquidez y sensibilidad macrofinanciera.</p>
+<p>Sexto, las pruebas de robustez refinan la conclusión. Bajo la
+especificación principal, PM domina también al cambiar la función de
+pérdida, salvo una excepción PA en USD/COP bajo ponderación de
+vencimientos cortos. Al cambiar la base B-spline, la base parsimoniosa
+preserva prácticamente el mismo resultado, mientras que la base más
+flexible genera excepciones locales. Esto indica que la resolución de la
+base puede importar para ciertos tramos de la superficie, pero no
+produce una mejora dinámica consistente en pares, horizontes y
+pérdidas.</p>
+<p>El resultado negativo es metodológicamente relevante. Rechazar una
+hipótesis predictiva frente a un benchmark fuerte no invalida la tesis;
+al contrario, delimita con precisión qué aporta el enfoque funcional. La
+FPCA sirve para representar, comprimir e interpretar superficies. El
+backtest muestra que esta ventaja descriptiva no garantiza superioridad
+predictiva bajo RMSE crudo y horizontes cortos o medianos.</p>
+<h1 id="limitaciones">Limitaciones</h1>
+<p>La primera limitación es la longitud de la muestra. Aunque 299
+superficies completas representan una base valiosa para mercados
+latinoamericanos, siguen siendo pocas observaciones para estimar modelos
+dinámicos flexibles, especialmente variantes kernel o sistemas VAR de
+dimensión moderada.</p>
+<p>La segunda limitación es la métrica de evaluación. El RMSE sobre
+malla observada favorece modelos que reproducen directamente los nodos
+crudos. PM no impone suavidad, no reconstruye y no filtra ruido. Las
+pruebas de robustez con MAE y RMSE ponderado reducen esta preocupación,
+pero no agotan el universo de pérdidas económicamente relevantes. En
+aplicaciones de valorización, gestión de riesgo o construcción de
+superficies económicamente consistentes, podrían ser relevantes otras
+métricas que ponderen tenores, deltas, no arbitraje o pérdidas
+económicas.</p>
+<p>La tercera limitación es que los pronósticos usan únicamente
+información interna de la superficie. No se incorporan variables
+exógenas como spot, tasas de interés, diferencial de tasas, carry,
+liquidez, precios de commodities o indicadores de estrés. Tales
+variables podrían ser relevantes para horizontes mayores.</p>
+<p>La cuarta limitación es que la representación no impone restricciones
+explícitas de no arbitraje. La tesis se centra en representación
+estadística y evaluación predictiva sobre una malla fija, no en
+garantizar convexidad, monotonicidad u otras condiciones económicas de
+precios de opciones en todo el dominio.</p>
+<p>La quinta limitación es la dependencia de la malla Bloomberg. La
+disponibilidad de una malla completa facilita la comparación, pero
+también implica que se trabaja con superficies ya procesadas por una
+fuente de datos. En mercados menos líquidos, la construcción primaria de
+la superficie desde cotizaciones de opciones puede introducir desafíos
+adicionales.</p>
+<h1 id="conclusiones">Conclusiones</h1>
+<p>Esta tesis evaluó un enfoque funcional para superficies de
+volatilidad implícita de divisas en mercados latinoamericanos y comparó
+su desempeño predictivo frente a un benchmark exigente de persistencia
+cruda. La conclusión principal es que el enfoque funcional es
+descriptivamente exitoso, pero no predictivamente superior bajo el
+diseño de backtest evaluado.</p>
+<p>En la dimensión descriptiva, los resultados son contundentes. Los
+ocho pares cuentan con 299 superficies completas entre el 4 de febrero
+de 2025 y el 27 de marzo de 2026. La FPCA con corrección métrica muestra
+que una o dos componentes explican al menos 95% de la variación
+funcional, y dos o tres componentes explican al menos 99%. En USD/PEN,
+las dos primeras componentes explican 98.05% y las tres primeras 99.37%.
+Esto confirma H1: las superficies de volatilidad implícita poseen una
+estructura funcional de baja dimensión.</p>
+<p>En la dimensión predictiva, la evidencia rechaza H2. En los ocho
+pares y tres horizontes evaluados, PM obtiene el menor RMSE mediano. Las
+alternativas PA, VAR1, ARHinc y KernelARH no superan de manera
+sistemática el benchmark. En USD/PEN, el resultado es especialmente
+claro: PM registra RMSE medianos de 0.1200, 0.3227 y 0.4223 para <span
+class="math inline"><em>h</em> = 1, 5, 10</span>, mientras que las
+mejores alternativas no PM registran 0.9670, 0.9998 y 1.0394. Las
+pruebas DM indican inferioridad estadística de las alternativas en todos
+los horizontes de USD/PEN.</p>
+<p>La evidencia también apoya H3. La persistencia cruda es un benchmark
+difícil porque las superficies son persistentes y porque PM no incurre
+en errores de suavizado, truncación o estimación. Las pruebas de
+robustez muestran que esta conclusión se mantiene bajo MAE,
+ponderaciones por tenor y bases alternativas, aunque una base más
+flexible genera excepciones locales en algunos pares y horizontes. El
+éxito descriptivo de FPCA no garantiza menor pérdida predictiva sobre
+una malla cruda.</p>
+<p>El aporte final de la tesis es, por tanto, una lectura equilibrada.
+La metodología funcional proporciona una representación parsimoniosa,
+interpretable y reproducible de superficies de volatilidad implícita. El
+ejercicio de pronóstico, diseñado sin filtración temporal y comparado
+contra una referencia fuerte, muestra que los modelos dinámicos en
+puntajes FPCA no mejoran la precisión fuera de muestra bajo RMSE en esta
+muestra. Este resultado negativo es informativo para investigación y
+práctica: antes de introducir dinámica sofisticada, es indispensable
+medir su valor incremental frente a persistencia cruda.</p>
+<h1 id="trabajo-futuro">Trabajo futuro</h1>
+<p>Una primera extensión consiste en ampliar la muestra temporal y
+repetir el backtest a medida que Bloomberg acumule nuevas superficies
+completas. Más observaciones permitirán estudiar estabilidad por
+régimen, eventos macroeconómicos y cambios de liquidez.</p>
+<p>Una segunda línea consiste en incorporar variables exógenas. Modelos
+VARX, regresiones funcionales con covariables o modelos de estado
+podrían incorporar spot, tasas, carry, inflación, commodities o
+indicadores de riesgo global.</p>
+<p>Una tercera extensión es evaluar pérdidas alternativas. Para
+aplicaciones de trading o riesgo, podría ser más relevante ponderar
+nodos por sensibilidad, liquidez o exposición de cartera, en lugar de
+usar RMSE uniforme sobre la malla.</p>
+<p>Una cuarta línea es integrar restricciones de forma y no arbitraje.
+La representación B-spline podría combinarse con penalizaciones o
+proyecciones que preserven regularidad económica, especialmente si el
+objetivo es usar las superficies para valorización directa.</p>
+<p>Finalmente, se puede explorar modelamiento con cambios de régimen. La
+heterogeneidad de ventanas seleccionadas sugiere que dinámicas con
+parámetros variables en el tiempo, modelos Markov-switching o filtros
+adaptativos podrían representar mejor episodios de estrés o
+intervención.</p>
+<h1 id="archivos-reproducibles">Archivos reproducibles</h1>
+<p>La corrida final se generó con el script
+<code>tesis_volatilidad_analysis_final.R</code> y el archivo
+<code>vols3.xlsx</code>. Los resultados agregados quedaron organizados
+en <code>tesis_outputs/</code>. Los archivos principales son:</p>
+<ul>
+<li><p><code>tesis_outputs/multi_moneda_status.csv</code></p></li>
+<li><p><code>tesis_outputs/resumen_disponibilidad_fpca.csv</code></p></li>
+<li><p><code>tesis_outputs/resumen_tuning_train_k0.csv</code></p></li>
+<li><p><code>tesis_outputs/resumen_rmse_mediana.csv</code></p></li>
+<li><p><code>tesis_outputs/resumen_rmse_wide.csv</code></p></li>
+<li><p><code>tesis_outputs/resumen_tasa_aciertos.csv</code></p></li>
+<li><p><code>tesis_outputs/resumen_dm.csv</code></p></li>
+<li><p><code>tesis_outputs/resumen_estabilidad_modelos.csv</code></p></li>
+<li><p><code>tesis_outputs/rolling_fpca_resumen_multimoneda.csv</code></p></li>
+<li><p><code>tesis_outputs/robustez_perdidas/</code></p></li>
+<li><p><code>tesis_outputs/robustez_bases/</code></p></li>
+</ul>
+<div class="thebibliography">
+<p><span>99</span></p>
+<p>Aue, A., Norinho, D. D., &amp; Hörmann, S. (2015). On the Prediction
+of Stationary Functional Time Series. <em>Journal of the American
+Statistical Association</em>, 110(509), 378–392. <a
+href="https://doi.org/10.1080/01621459.2014.909317"
+class="uri">https://doi.org/10.1080/01621459.2014.909317</a></p>
+<p>Avellaneda, M., Healy, B., Papanicolaou, A., &amp; Papanicolaou, G.
+(2020). PCA for Implied Volatility Surfaces. arXiv:2002.00085. <a
+href="https://doi.org/10.48550/arXiv.2002.00085"
+class="uri">https://doi.org/10.48550/arXiv.2002.00085</a></p>
+<p>Bosq, D. (2000). <em>Linear Processes in Function Spaces</em>.
+Springer. <a href="https://doi.org/10.1007/978-1-4612-1154-9"
+class="uri">https://doi.org/10.1007/978-1-4612-1154-9</a></p>
+<p>Bosq, D., &amp; Blanke, D. (2007). <em>Inference and Prediction in
+Large Dimensions</em>. Wiley. <a
+href="https://doi.org/10.1002/9780470724033"
+class="uri">https://doi.org/10.1002/9780470724033</a></p>
+<p>Cont, R., &amp; Da Fonseca, J. (2002). Dynamics of Implied Volatility
+Surfaces. <em>Quantitative Finance</em>, 2(1), 45–60. <a
+href="https://doi.org/10.1088/1469-7688/2/1/304"
+class="uri">https://doi.org/10.1088/1469-7688/2/1/304</a></p>
+<p>de Boor, C. (2001). <em>A Practical Guide to Splines</em>. Springer.
+<a href="https://doi.org/10.1137/1022106"
+class="uri">https://doi.org/10.1137/1022106</a></p>
+<p>Diebold, F. X., &amp; Mariano, R. S. (1995). Comparing Predictive
+Accuracy. <em>Journal of Business &amp; Economic Statistics</em>, 13(3),
+253–263. <a href="https://doi.org/10.1080/07350015.1995.10524599"
+class="uri">https://doi.org/10.1080/07350015.1995.10524599</a></p>
+<p>Eilers, P. H. C., &amp; Marx, B. D. (2003). Multivariate calibration
+with temperature interaction using two-dimensional penalized signal
+regression. <em>Chemometrics and Intelligent Laboratory Systems</em>,
+66(2), 159–174. <a href="https://doi.org/10.1016/S0169-7439(03)00029-7"
+class="uri">https://doi.org/10.1016/S0169-7439(03)00029-7</a></p>
+<p>Fahrmeir, L., &amp; Tutz, G. (2001). <em>Multivariate Statistical
+Modelling Based on Generalized Linear Models</em>. Springer. <a
+href="https://doi.org/10.1007/978-1-4757-3454-6"
+class="uri">https://doi.org/10.1007/978-1-4757-3454-6</a></p>
+<p>Fengler, M. R., Härdle, W. K., &amp; Villa, C. (2003). The Dynamics
+of Implied Volatilities: A Common Principal Components Approach.
+<em>Review of Derivatives Research</em>, 6(3), 179–202. <a
+href="https://doi.org/10.1023/B:REDR.0000004823.77464.2d"
+class="uri">https://doi.org/10.1023/B:REDR.0000004823.77464.2d</a></p>
+<p>Ferraty, F., &amp; Vieu, P. (2006). <em>Nonparametric Functional Data
+Analysis: Theory and Practice</em>. Springer.</p>
+<p>Grith, M., Wagner, H., Härdle, W. K., &amp; Kneip, A. (2018).
+Functional Principal Component Analysis for Derivatives of Multivariate
+Curves. <em>Statistica Sinica</em>. <a
+href="https://doi.org/10.5705/ss.202017.0199"
+class="uri">https://doi.org/10.5705/ss.202017.0199</a></p>
+<p>Hagan, P., Kumar, D., Lesniewski, A., &amp; Woodward, D. (2002).
+Managing Smile Risk. <em>Wilmott Magazine</em>, 1, 84–108.</p>
+<p>Heston, S. L. (1993). A Closed-Form Solution for Options with
+Stochastic Volatility with Applications to Bond and Currency Options.
+<em>Review of Financial Studies</em>, 6(2), 327–343. <a
+href="https://doi.org/10.1093/rfs/6.2.327"
+class="uri">https://doi.org/10.1093/rfs/6.2.327</a></p>
+<p>Jaimungal, S., &amp; Ng, E. K. H. (2007). Consistent Functional PCA
+for Financial Time-Series. <em>Proceedings of the Fourth IASTED
+International Conference on Financial Engineering and Applications</em>,
+103–108. <a
+href="https://www.utstat.toronto.edu/sjaimung/papers/VAR-FPCA.pdf"
+class="uri">https://www.utstat.toronto.edu/sjaimung/papers/VAR-FPCA.pdf</a></p>
+<p>James, G., Hastie, T., &amp; Sugar, C. (2000). Principal Component
+Models for Sparse Functional Data. <em>Biometrika</em>, 87(3), 587–602.
+<a href="https://doi.org/10.1093/biomet/87.3.587"
+class="uri">https://doi.org/10.1093/biomet/87.3.587</a></p>
+<p>Kearney, F., Cummins, M., &amp; Murphy, F. (2018). Forecasting
+Implied Volatility in Foreign Exchange Markets: A Functional Time Series
+Approach. <em>The European Journal of Finance</em>, 24(1), 1–18. <a
+href="https://doi.org/10.1080/1351847X.2016.1271441"
+class="uri">https://doi.org/10.1080/1351847X.2016.1271441</a></p>
+<p>Li, C., Xiao, L., &amp; Luo, S. (2020). Fast Covariance Estimation
+for Multivariate Sparse Functional Data. <em>Stat</em>, 9(1), e245. <a
+href="https://doi.org/10.1002/sta4.245"
+class="uri">https://doi.org/10.1002/sta4.245</a></p>
+<p>Liang, Z., Weng, F., Ma, Y., Xu, Y., Zhu, M., &amp; Yang, C. (2022).
+Measurement and Analysis of High Frequency Asset Volatility Based on
+Functional Data Analysis. <em>Mathematics</em>, 10(7), 1140. <a
+href="https://doi.org/10.3390/math10071140"
+class="uri">https://doi.org/10.3390/math10071140</a></p>
+<p>Mas, A., &amp; Pumo, B. (2009). Functional Linear Regression with
+Derivatives. <em>Journal of Nonparametric Statistics</em>, 21(1), 19–40.
+<a href="https://doi.org/10.1080/10485250802401046"
+class="uri">https://doi.org/10.1080/10485250802401046</a></p>
+<p>Petrovich, J. (2018). <em>Functional Principal Component Analysis and
+Sparse Functional Regression</em>. PhD Thesis, Pennsylvania State
+University.</p>
+<p>Ramsay, J. O., &amp; Silverman, B. W. (2006). <em>Functional Data
+Analysis</em>. Springer.</p>
+<p>Reiss, P. T., &amp; Xu, M. (2020). Tensor product splines and
+functional principal components. <em>Journal of Statistical Planning and
+Inference</em>, 208, 1–12. <a
+href="https://doi.org/10.1016/j.jspi.2019.10.006"
+class="uri">https://doi.org/10.1016/j.jspi.2019.10.006</a></p>
+<p>Ruiz-Medina, M. D., Miranda, D., &amp; Espejo, R. M. (2019).
+Dynamical Multiple Regression in Function Spaces, Under Kernel
+Regressors, with ARH(1) Errors. <em>TEST</em>, 28(3), 943–968. <a
+href="https://doi.org/10.1007/s11749-018-0614-2"
+class="uri">https://doi.org/10.1007/s11749-018-0614-2</a></p>
+<p>Ruppert, D., Wand, M. P., &amp; Carroll, R. J. (2003).
+<em>Semiparametric Regression</em>. Cambridge University Press. <a
+href="https://doi.org/10.1017/CBO9780511755453"
+class="uri">https://doi.org/10.1017/CBO9780511755453</a></p>
+<p>Shang, H. L., &amp; Kearney, F. (2022). Dynamic Functional
+Time-Series Forecasts of Foreign Exchange Implied Volatility Surfaces.
+<em>International Journal of Forecasting</em>, 38(3), 1025–1049. <a
+href="https://doi.org/10.1016/j.ijforecast.2021.07.011"
+class="uri">https://doi.org/10.1016/j.ijforecast.2021.07.011</a></p>
+<p>Sui, C., Lung, P., &amp; Yang, M. (2020). Predictable Dynamics in the
+Implied Volatility Surface Based on Weighted Least Squares: Evidence
+from Soybean Meal Futures Options in China. <em>Emerging Markets Finance
+and Trade</em>, 56(11), 2625–2638. <a
+href="https://doi.org/10.1080/1540496X.2019.1616543"
+class="uri">https://doi.org/10.1080/1540496X.2019.1616543</a></p>
+<p>Tan, Y., Tan, Z., Tang, Y., &amp; Zhang, Z. (2024). Functional
+Volatility Forecasting. <em>Journal of Forecasting</em>, 43(8),
+3009–3034. <a href="https://doi.org/10.1002/for.3170"
+class="uri">https://doi.org/10.1002/for.3170</a></p>
+<p>Weaver, C., Perryman, B., Jiang, J., Chien, A., Meoded, E., &amp;
+Kirk, A. (2020). <em>Functional PCA for Implied Volatility Surface
+Prediction</em>. MetLife Investment Management.</p>
+<p>Wood, S. N. (2017). <em>Generalized Additive Models: An Introduction
+with R</em>. Chapman &amp; Hall/CRC. <a
+href="https://doi.org/10.1201/9781315370279"
+class="uri">https://doi.org/10.1201/9781315370279</a></p>
+</div>
+</body>
+</html>
