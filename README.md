@@ -11,6 +11,7 @@ Repositorio de trabajo para el analisis funcional y la reescritura de tesis sobr
 - `analyze_fpca_scores.R`: diagnosticos y visualizaciones de puntajes FPCA.
 - `tesis_basis_robustness.R`: robustez a la especificacion de base B-spline.
 - `tesis_draft_detallado.tex`: borrador LaTeX actualizado con resultados rolling FPCA y robustez.
+- `compile_thesis.sh`: compilador local del borrador con TinyTeX/latexmk.
 - `tesis_rewrite_final.tex`: borrador LaTeX reescrito con el nuevo encuadre empirico.
 - `tesis_rewrite_final.html`: vista previa HTML generada desde el borrador LaTeX.
 - `tesis_outputs/`: tablas, figuras y objetos `.rds` generados por la corrida final.
@@ -45,6 +46,12 @@ BASIS_ROBUSTNESS_BASIS_IDS='base_4x8,coarse_4x6,rich_5x10' \
 BASIS_ROBUSTNESS_MAX_K0='15' \
 BASIS_ROBUSTNESS_INCLUDE_KERNEL='TRUE' \
 Rscript tesis_basis_robustness.R
+```
+
+Compilar el borrador LaTeX:
+
+```sh
+./compile_thesis.sh
 ```
 
 ## Resultado empirico central
