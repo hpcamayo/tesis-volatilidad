@@ -657,7 +657,7 @@ La corrida reportada usa ventana móvil \(W=80\), truncamiento \(K_0=3\) y los m
   \item KernelARH: media condicional no paramétrica y memoria residual ARH(1).
 \end{itemize}
 
-El número de replicaciones se deja configurable en el script \texttt{tesis\_simulation\_study.R}. Los resultados incluidos en esta versión corresponden a una corrida reproducible de verificación con \(B=50\) replicaciones; el valor por defecto del script es \(B=200\), y puede aumentarse a \(B=500\) o \(B=1000\) sin modificar el resto del pipeline.
+El número de replicaciones se deja configurable en el script \texttt{tesis\_simulation\_study.R}. Los resultados incluidos en esta versión corresponden a una corrida reproducible completa con \(B=1000\) replicaciones, \(T=220\), ventana móvil \(W=80\), truncamiento \(K_0=3\), KernelARH activado y semilla \texttt{20260525}.
 
 \subsection{Métricas de evaluación}
 
@@ -692,7 +692,7 @@ Como controles adicionales se calculan el error absoluto medio y el error cuadr�
   \widehat X_{t+h|t}^{(m)}(u)-X_{t+h}(u)
   \right)^2.
 \]
-Para cada escenario, horizonte y modelo se reporta la mediana de RMSE por replicación y la frecuencia con que cada modelo obtiene el primer lugar en RMSE.
+Para cada escenario, horizonte y modelo se reporta la mediana de RMSE sobre los errores fuera de muestra y la frecuencia con que cada modelo obtiene el primer lugar en RMSE a nivel de replicación.
 
 \subsection{Resultados de simulación}
 
@@ -707,15 +707,15 @@ La Tabla \ref{tab:sim_summary} resume los resultados principales. La lectura es 
 \toprule
 Escenario & \(h\) & PM & PA & Mejor dinámico & PM gana \\
 \midrule
-Cambio de régimen & 1 & 0.294 & 0.256 & KernelARH (0.254) & 0\% \\
-Cambio de régimen & 5 & 0.330 & 0.259 & VAR1 (0.254) & 0\% \\
-Cambio de régimen & 10 & 0.340 & 0.261 & VAR1 (0.256) & 0\% \\
-Alta persistencia & 1 & 0.104 & 0.177 & ARHinc (0.177) & 100\% \\
-Alta persistencia & 5 & 0.147 & 0.185 & ARHinc (0.183) & 98\% \\
-Alta persistencia & 10 & 0.174 & 0.191 & ARHinc (0.189) & 76\% \\
-Baja persistencia & 1 & 0.321 & 0.255 & KernelARH (0.252) & 0\% \\
-Baja persistencia & 5 & 0.340 & 0.256 & KernelARH (0.251) & 0\% \\
-Baja persistencia & 10 & 0.345 & 0.258 & VAR1 (0.252) & 0\% \\
+Cambio de régimen & 1 & 0.293 & 0.254 & KernelARH (0.251) & 0.1\% \\
+Cambio de régimen & 5 & 0.325 & 0.257 & KernelARH (0.253) & 0.0\% \\
+Cambio de régimen & 10 & 0.335 & 0.259 & VAR1 (0.254) & 0.0\% \\
+Alta persistencia & 1 & 0.104 & 0.173 & ARHinc (0.172) & 100.0\% \\
+Alta persistencia & 5 & 0.146 & 0.181 & ARHinc (0.180) & 97.5\% \\
+Alta persistencia & 10 & 0.173 & 0.188 & ARHinc (0.187) & 74.2\% \\
+Baja persistencia & 1 & 0.321 & 0.254 & KernelARH (0.250) & 0.0\% \\
+Baja persistencia & 5 & 0.341 & 0.256 & VAR1 (0.250) & 0.0\% \\
+Baja persistencia & 10 & 0.341 & 0.255 & KernelARH (0.250) & 0.0\% \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -725,19 +725,19 @@ Baja persistencia & 10 & 0.345 & 0.258 & VAR1 (0.252) & 0\% \\
 \caption{Simulación: frecuencia de ranking 1 bajo RMSE}
 \label{tab:sim_rankings}
 \scriptsize
-\begin{tabular}{llrrrr}
+\begin{tabular}{llrrrrr}
 \toprule
-Escenario & \(h\) & PM & VAR1 & ARHinc & KernelARH \\
+Escenario & \(h\) & PM & PA & VAR1 & ARHinc & KernelARH \\
 \midrule
-Cambio de régimen & 1 & 0.00 & 0.18 & 0.30 & 0.52 \\
-Cambio de régimen & 5 & 0.00 & 0.40 & 0.18 & 0.42 \\
-Cambio de régimen & 10 & 0.00 & 0.56 & 0.08 & 0.36 \\
-Alta persistencia & 1 & 1.00 & 0.00 & 0.00 & 0.00 \\
-Alta persistencia & 5 & 0.98 & 0.02 & 0.00 & 0.00 \\
-Alta persistencia & 10 & 0.76 & 0.10 & 0.08 & 0.06 \\
-Baja persistencia & 1 & 0.00 & 0.26 & 0.10 & 0.64 \\
-Baja persistencia & 5 & 0.00 & 0.46 & 0.04 & 0.50 \\
-Baja persistencia & 10 & 0.00 & 0.54 & 0.02 & 0.44 \\
+Cambio de régimen & 1 & 0.001 & 0.005 & 0.229 & 0.253 & 0.512 \\
+Cambio de régimen & 5 & 0.000 & 0.000 & 0.475 & 0.090 & 0.435 \\
+Cambio de régimen & 10 & 0.000 & 0.000 & 0.491 & 0.054 & 0.455 \\
+Alta persistencia & 1 & 1.000 & 0.000 & 0.000 & 0.000 & 0.000 \\
+Alta persistencia & 5 & 0.975 & 0.000 & 0.006 & 0.011 & 0.008 \\
+Alta persistencia & 10 & 0.742 & 0.000 & 0.058 & 0.140 & 0.060 \\
+Baja persistencia & 1 & 0.000 & 0.001 & 0.228 & 0.034 & 0.737 \\
+Baja persistencia & 5 & 0.000 & 0.000 & 0.545 & 0.003 & 0.452 \\
+Baja persistencia & 10 & 0.000 & 0.000 & 0.513 & 0.007 & 0.480 \\
 \bottomrule
 \end{tabular}
 \end{table}
