@@ -1,0 +1,4 @@
+scenario,description,rho_main,rho_secondary,regime_change
+strong_persistence,Leading score AR(1) highly persistent,0.985,0.9,FALSE
+weak_persistence,Leading score AR(1) weakly persistent,0.35,0.2,FALSE
+regime_change,Shift in score persistence and mean/component structure,NA,NA,TRUE

@@ -17,6 +17,7 @@ Rplots.pdf
 *.run.xml
 *.synctex.gz
 *.toc
+*.xdv
 
 # Editor and OS noise
 .idea/

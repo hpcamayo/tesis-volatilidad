@@ -82,6 +82,8 @@ La respuesta empírica requiere distinguir dos planos. El primero es descriptivo
 
 Esta tesis propone y evalúa un flujo de trabajo funcional completo. Primero, cada superficie diaria se aproxima mediante una base B-spline tensorial sobre delta y tenor. Segundo, se corrige la métrica de los coeficientes mediante la matriz de Gram y su factorización de Cholesky, de modo que la FPCA se realice en la geometría \(L^2\) correspondiente. Tercero, se comparan modelos de pronóstico fuera de muestra sobre puntajes FPCA contra dos persistencias: persistencia cruda en la malla observada (PM) y persistencia de la superficie ajustada (PA). La evaluación se realiza mediante ventanas móviles, selección libre de filtración temporal de \(TRAIN\_SIZE\) y \(K_0\), RMSE sobre la malla observada, tasas de acierto frente a PM y pruebas de Diebold-Mariano \cite{DieboldMariano1995}.
 
+Además del ejercicio empírico con datos de mercado, la tesis incorpora una validación mediante simulación. Esta pieza permite evaluar el comportamiento del mismo esquema de representación, FPCA móvil y pronóstico cuando el proceso generador de datos es conocido. El objetivo no es reproducir toda la complejidad microestructural del mercado cambiario, sino verificar si la metodología se comporta de manera coherente cuando se controla explícitamente el grado de persistencia y la presencia de cambios de régimen.
+
 El resultado principal es doble. En la dimensión descriptiva, la FPCA confirma que las \SVIs{} de los ocho pares analizados poseen una estructura fuertemente de baja dimensión: una o dos componentes bastan para alcanzar 95\% de varianza explicada, y dos o tres para alcanzar 99\%. En la dimensión predictiva, la persistencia cruda domina bajo RMSE mediano en todos los pares y horizontes de la corrida verificada. Por tanto, la tesis no sostiene que los modelos dinámicos FPCA superen al benchmark; sostiene que la representación funcional es una herramienta potente de compresión e interpretación, y que el backtest entrega una prueba rigurosa donde la hipótesis predictiva es rechazada.
 
 \subsection{Objetivos}
@@ -97,6 +99,7 @@ Los objetivos específicos son:
   \item Aplicar FPCA en la métrica funcional correcta, usando la matriz de Gram y su factorización de Cholesky para evitar distorsiones por la no ortonormalidad de la base.
   \item Diseñar un backtest fuera de muestra sin filtración temporal, con selección conjunta de ventana de entrenamiento y número de componentes.
   \item Comparar PM, PA, VAR(1), ARH en incrementos y KernelARH mediante RMSE sobre la malla observada, tasas de acierto, pruebas de Diebold-Mariano y pruebas de robustez por función de pérdida y especificación de base.
+  \item Validar mediante simulación Monte Carlo el comportamiento del esquema FPCA móvil bajo procesos funcionales controlados con alta persistencia, baja persistencia e inestabilidad estructural.
   \item Interpretar los resultados distinguiendo éxito descriptivo, desempeño predictivo y fuentes de error de representación, truncación y estimación dinámica.
 \end{enumerate}
 
@@ -112,7 +115,7 @@ La tesis evalúa tres hipótesis:
 
 \subsection{Organización del trabajo}
 
-La Sección 2 presenta los conceptos financieros básicos: opciones, moneyness, volatilidad implícita y superficies de volatilidad. La Sección 3 revisa literatura sobre FDA, B-splines, FPCA y modelos dinámicos funcionales. La Sección 4 desarrolla con detalle la metodología, desde espacios de Hilbert hasta modelos de pronóstico en puntajes FPCA. La Sección 5 describe los datos y la construcción del panel. Las Secciones 6 y 7 presentan los resultados descriptivos y predictivos. La Sección 8 reporta diagnósticos de estabilidad. Las Secciones 9, 10 y 11 discuten los hallazgos, limitaciones y conclusiones.
+La Sección 2 presenta los conceptos financieros básicos: opciones, moneyness, volatilidad implícita y superficies de volatilidad. La Sección 3 revisa literatura sobre FDA, B-splines, FPCA y modelos dinámicos funcionales. La Sección 4 desarrolla con detalle la metodología, desde espacios de Hilbert hasta modelos de pronóstico en puntajes FPCA. La Sección 5 valida el esquema de pronóstico mediante simulación Monte Carlo. La Sección 6 describe los datos y la construcción del panel. Las Secciones 7 y 8 presentan los resultados descriptivos y predictivos. La Sección 9 reporta diagnósticos de estabilidad. Las Secciones 10, 11 y 12 discuten los hallazgos, limitaciones y conclusiones.
 
 \section{Conceptos básicos sobre opciones y superficies de volatilidad implícita}
 
@@ -588,6 +591,174 @@ Para enfatizar vencimientos cortos se usa \(w_q\propto 1/\sqrt{\tau_q}\); para e
 
 Finalmente, se evalúa robustez a la resolución de la base B-spline. Además de la especificación principal \(\texttt{base\_4x8}\), se consideran una base parsimoniosa \(\texttt{coarse\_4x6}\) y una base flexible \(\texttt{rich\_5x10}\). En esta prueba se mantiene fijo el \(TRAIN\_SIZE\) seleccionado por la corrida principal de cada par y se reoptimiza \(K_0\) por horizonte y base. Esto permite distinguir si las conclusiones predictivas dependen de la suavidad impuesta por la base.
 
+\section{Validación mediante simulación del esquema de pronóstico con FPCA móvil}
+\label{sec:simulacion}
+
+Esta sección presenta un estudio de simulación Monte Carlo diseñado para validar el comportamiento del esquema de representación funcional, FPCA móvil y pronóstico usado en la tesis. El ejercicio no busca reproducir toda la complejidad del mercado cambiario ni las restricciones microestructurales de las \SVIs{} observadas. Su objetivo es más preciso: estudiar si el procedimiento se comporta de manera coherente cuando el proceso generador de datos es conocido y cuando se controla explícitamente el grado de persistencia de los factores latentes y la presencia de inestabilidad estructural.
+
+La motivación directa proviene del resultado empírico principal. En los datos reales, la persistencia cruda en la malla observada domina a los modelos dinámicos en puntajes bajo RMSE mediano. Una preocupación metodológica natural es si esa dominancia podría ser inducida mecánicamente por la FPCA, por el truncamiento o por la manera de reconstruir superficies. La simulación permite separar estos efectos: si el verdadero proceso es altamente persistente, la persistencia debería rankear bien; si el proceso tiene baja persistencia, los modelos dinámicos deberían recuperar parte de la ventaja; y si hay cambios de régimen, la estimación móvil debería ser útil, aunque con mayor variabilidad.
+
+\subsection{Proceso generador funcional}
+
+Cada observación simulada se define sobre la misma malla de 65 nodos usada en la aplicación empírica: cinco deltas y trece tenores. Sea \(u\in\mathcal{U}\) un nodo de esa malla. El proceso funcional se escribe como
+\[
+  X_t(u)
+  =
+  \mu(u)
+  +
+  \sum_{k=1}^{K}\xi_{k,t}\phi_k(u)
+  +
+  \epsilon_t(u),
+  \qquad K=3.
+\]
+Aquí \(X_t(u)\) representa la volatilidad simulada en el nodo \(u\), \(\mu(u)\) es una curva media suave, \(\phi_k(u)\) son componentes funcionales conocidas, \(\xi_{k,t}\) son puntajes latentes variables en el tiempo y \(\epsilon_t(u)\) es ruido idiosincrático. Las componentes se construyen para imitar tres deformaciones habituales de una superficie de volatilidad: nivel, inclinación por delta y curvatura local. Para evitar que la evaluación dependa de componentes artificialmente colineales, las funciones \(\phi_k\) se ortogonalizan numéricamente sobre la malla.
+
+La media \(\mu(u)\) se especifica como una función suave creciente en tenor y con mayor volatilidad en las alas de delta. Esta elección genera superficies realistas en escala de volatilidad, pero mantiene el diseño lo suficientemente simple para que la interpretación de los resultados sea transparente. Las superficies simuladas se proyectan luego sobre la misma base B-spline tensorial \(\texttt{base\_4x8}\) utilizada en la especificación principal: \(K_\delta=4\), \(K_\tau=8\), diseño \(X=\Phi_\tau\otimes\Phi_\delta\), métrica \(G=G_\tau\otimes G_\delta\) y corrección Gram-Cholesky.
+
+\begin{figure}[H]
+\centering
+\maybeinclude[width=0.95\linewidth]{tesis_outputs/simulacion/fig_simulated_curves.pdf}
+\caption{Ejemplos de curvas simuladas por escenario. Cada panel muestra cortes por tenor para deltas seleccionados, manteniendo la misma escala funcional de la aplicación empírica.}
+\label{fig:sim_curves}
+\end{figure}
+
+\subsection{Escenarios de simulación}
+
+Se consideran tres escenarios. El diseño se mantiene deliberadamente acotado para que el capítulo funcione como validación metodológica y no como un estudio paralelo de gran dimensión.
+
+\begin{table}[H]
+\centering
+\caption{Escenarios del estudio de simulación}
+\label{tab:sim_scenarios}
+\small
+\begin{tabular}{p{0.24\linewidth}p{0.39\linewidth}p{0.27\linewidth}}
+\toprule
+Escenario & Dinámica latente & Comportamiento esperado \\
+\midrule
+Alta persistencia & Los puntajes siguen AR(1) con \(\rho=(0.985,0.90,0.75)\) y ruido bajo. & PM debe ser competitivo, especialmente en horizontes cortos. \\
+Baja persistencia & Los puntajes siguen AR(1) con \(\rho=(0.35,0.20,0.05)\). & La ventaja de PM debe reducirse y los modelos en puntajes deben mejorar. \\
+Cambio de régimen & A mitad de muestra cambian la persistencia de los puntajes y la estructura media/componente de la superficie. & La FPCA móvil puede adaptarse, pero los rankings deben ser menos estables. \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+El primer escenario representa el caso más favorable para la persistencia. El segundo escenario evalúa si el pipeline puede detectar un entorno donde copiar la última superficie deja de ser una regla adecuada. El tercero introduce una ruptura estructural para estudiar la sensibilidad del procedimiento a cambios en la geometría funcional, una situación relevante para mercados emergentes con episodios de intervención, estrés o reconfiguración de expectativas.
+
+\subsection{Estimación móvil y modelos evaluados}
+
+La estimación replica el diseño empírico de manera simplificada. En cada replicación se generan \(T\) superficies simuladas y se evalúan horizontes \(h\in\{1,5,10\}\). Para cada fecha fuera de muestra, la base tensorial se ajusta a las superficies disponibles, la FPCA se estima usando únicamente la ventana de entrenamiento móvil y los pronósticos se reconstruyen en la malla original. Así se evita filtración temporal: las componentes, la media funcional y los parámetros dinámicos usados para pronosticar \(X_{t+h}\) dependen solo de información observada hasta \(t\).
+
+La corrida reportada usa ventana móvil \(W=80\), truncamiento \(K_0=3\) y los mismos modelos de la aplicación empírica:
+\begin{itemize}
+  \item PM: persistencia cruda en la malla observada.
+  \item PA: persistencia de la superficie ajustada por base.
+  \item VAR1: modelo autorregresivo vectorial de orden uno en puntajes.
+  \item ARHinc: dinámica autorregresiva en incrementos de puntajes.
+  \item KernelARH: media condicional no paramétrica y memoria residual ARH(1).
+\end{itemize}
+
+El número de replicaciones se deja configurable en el script \texttt{tesis\_simulation\_study.R}. Los resultados incluidos en esta versión corresponden a una corrida reproducible de verificación con \(B=50\) replicaciones; el valor por defecto del script es \(B=200\), y puede aumentarse a \(B=500\) o \(B=1000\) sin modificar el resto del pipeline.
+
+\subsection{Métricas de evaluación}
+
+La pérdida principal es el RMSE promedio fuera de muestra sobre la malla:
+\[
+  RMSE_{t,h}^{(m)}
+  =
+  \left[
+  \frac{1}{|\mathcal{U}|}
+  \sum_{u\in\mathcal{U}}
+  \left(
+  \widehat X_{t+h|t}^{(m)}(u)-X_{t+h}(u)
+  \right)^2
+  \right]^{1/2}.
+\]
+Como controles adicionales se calculan el error absoluto medio y el error cuadrático integrado discreto:
+\[
+  MAE_{t,h}^{(m)}
+  =
+  \frac{1}{|\mathcal{U}|}
+  \sum_{u\in\mathcal{U}}
+  \left|
+  \widehat X_{t+h|t}^{(m)}(u)-X_{t+h}(u)
+  \right|,
+\]
+\[
+  ISE_{t,h}^{(m)}
+  =
+  \frac{1}{|\mathcal{U}|}
+  \sum_{u\in\mathcal{U}}
+  \left(
+  \widehat X_{t+h|t}^{(m)}(u)-X_{t+h}(u)
+  \right)^2.
+\]
+Para cada escenario, horizonte y modelo se reporta la mediana de RMSE por replicación y la frecuencia con que cada modelo obtiene el primer lugar en RMSE.
+
+\subsection{Resultados de simulación}
+
+La Tabla \ref{tab:sim_summary} resume los resultados principales. La lectura es coherente con el diseño del experimento. Cuando la verdadera dinámica latente es casi una caminata aleatoria, PM obtiene el menor RMSE mediano y además gana la mayoría de replicaciones. Cuando la persistencia es baja, PM deja de ser competitivo y los modelos en puntajes, especialmente KernelARH y VAR1, pasan a dominar. En presencia de cambio de régimen, los modelos dinámicos también reducen el RMSE frente a PM, pero el modelo ganador se reparte entre VAR1, ARHinc y KernelARH, lo que refleja mayor inestabilidad de ranking.
+
+\begin{table}[H]
+\centering
+\caption{Simulación: RMSE mediano y frecuencia de victoria de PM}
+\label{tab:sim_summary}
+\scriptsize
+\begin{tabular}{llrrlr}
+\toprule
+Escenario & \(h\) & PM & PA & Mejor dinámico & PM gana \\
+\midrule
+Cambio de régimen & 1 & 0.294 & 0.256 & KernelARH (0.254) & 0\% \\
+Cambio de régimen & 5 & 0.330 & 0.259 & VAR1 (0.254) & 0\% \\
+Cambio de régimen & 10 & 0.340 & 0.261 & VAR1 (0.256) & 0\% \\
+Alta persistencia & 1 & 0.104 & 0.177 & ARHinc (0.177) & 100\% \\
+Alta persistencia & 5 & 0.147 & 0.185 & ARHinc (0.183) & 98\% \\
+Alta persistencia & 10 & 0.174 & 0.191 & ARHinc (0.189) & 76\% \\
+Baja persistencia & 1 & 0.321 & 0.255 & KernelARH (0.252) & 0\% \\
+Baja persistencia & 5 & 0.340 & 0.256 & KernelARH (0.251) & 0\% \\
+Baja persistencia & 10 & 0.345 & 0.258 & VAR1 (0.252) & 0\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{Simulación: frecuencia de ranking 1 bajo RMSE}
+\label{tab:sim_rankings}
+\scriptsize
+\begin{tabular}{llrrrr}
+\toprule
+Escenario & \(h\) & PM & VAR1 & ARHinc & KernelARH \\
+\midrule
+Cambio de régimen & 1 & 0.00 & 0.18 & 0.30 & 0.52 \\
+Cambio de régimen & 5 & 0.00 & 0.40 & 0.18 & 0.42 \\
+Cambio de régimen & 10 & 0.00 & 0.56 & 0.08 & 0.36 \\
+Alta persistencia & 1 & 1.00 & 0.00 & 0.00 & 0.00 \\
+Alta persistencia & 5 & 0.98 & 0.02 & 0.00 & 0.00 \\
+Alta persistencia & 10 & 0.76 & 0.10 & 0.08 & 0.06 \\
+Baja persistencia & 1 & 0.00 & 0.26 & 0.10 & 0.64 \\
+Baja persistencia & 5 & 0.00 & 0.46 & 0.04 & 0.50 \\
+Baja persistencia & 10 & 0.00 & 0.54 & 0.02 & 0.44 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\maybeinclude[width=0.95\linewidth]{tesis_outputs/simulacion/fig_loss_distributions.pdf}
+\caption{Distribución del RMSE promedio por replicación, escenario, horizonte y modelo.}
+\label{fig:sim_loss}
+\end{figure}
+
+\subsection{Interpretación}
+
+El estudio de simulación proporciona una validación metodológica controlada del pipeline. En primer lugar, confirma que cuando el proceso generador es fuertemente persistente, la persistencia cruda debe ser un benchmark difícil de superar. Esto es consistente con los resultados empíricos de la tesis, donde PM domina en todos los pares y horizontes bajo RMSE mediano.
+
+En segundo lugar, el escenario de baja persistencia muestra que la dominancia de PM no está inducida mecánicamente por la FPCA ni por la reconstrucción funcional. Cuando la verdadera dinámica de los puntajes tiene menor memoria, los modelos en puntajes recuperan capacidad predictiva y PM pierde todos los rankings de RMSE. Este resultado es importante porque demuestra que el backtest no está sesgado estructuralmente a favor de PM: bajo un proceso distinto, el mismo procedimiento sí identifica ventajas de modelos dinámicos.
+
+En tercer lugar, el escenario con cambio de régimen sugiere que la FPCA móvil ayuda a adaptar la representación a cambios locales, pero no elimina la variabilidad de estimación. En estos casos, las ganancias frente a PM aparecen, aunque el modelo ganador cambia por horizonte y por replicación. Esta evidencia es compatible con la lectura de que, en datos cambiarios reales, cambios de régimen y ventanas cortas pueden hacer que la compresión funcional sea descriptivamente útil sin traducirse necesariamente en mejoras predictivas robustas.
+
+En síntesis, la simulación no prueba el resultado empírico, pero lo contextualiza. Bajo condiciones controladas, el pipeline se comporta como debería: favorece PM cuando la persistencia verdadera es extrema, favorece modelos dinámicos cuando la persistencia es baja y produce rankings menos estables cuando existe inestabilidad estructural. Por tanto, la dominancia empírica de la persistencia en las \SVIs{} observadas se interpreta como una característica de los datos y de la función de pérdida evaluada, no como un artefacto mecánico del procedimiento FPCA.
+
 \section{Datos}
 
 La base de datos proviene de superficies diarias publicadas por Bloomberg para ocho pares de divisas. Luego del filtrado por superficies completas, cada par cuenta con 299 fechas desde el 4 de febrero de 2025 hasta el 27 de marzo de 2026. Los pares son:
@@ -707,6 +878,8 @@ La Tabla \ref{tab:rolling_fpca} muestra tres patrones. Primero, la baja dimensi�
 Este diagnóstico refuerza la lectura descriptiva de la tesis. La FPCA no solo comprime las superficies; también revela heterogeneidad temporal en la geometría de los factores. Sin embargo, esta evidencia no implica superioridad predictiva. Más bien justifica el uso de ventanas rolling-locales en el backtest y sugiere, como extensión futura, modelos con componentes o parámetros dependientes del régimen.
 
 \section{Resultados predictivos fuera de muestra}
+
+La interpretación de esta sección debe leerse junto con la validación por simulación de la Sección \ref{sec:simulacion}. Allí se verifica, bajo procesos funcionales controlados, que el mismo pipeline puede favorecer modelos dinámicos cuando la persistencia verdadera es baja. Por tanto, la dominancia empírica de PM reportada aquí no se interpreta como una consecuencia mecánica del uso de FPCA, sino como un resultado específico de las \SVIs{} observadas y de la pérdida evaluada.
 
 \subsection{Tuning seleccionado}
 
@@ -910,6 +1083,8 @@ Sexto, las pruebas de robustez refinan la conclusión. Bajo la especificación p
 
 El resultado negativo es metodológicamente relevante. Rechazar una hipótesis predictiva frente a un benchmark fuerte no invalida la tesis; al contrario, delimita con precisión qué aporta el enfoque funcional. La FPCA sirve para representar, comprimir e interpretar superficies. El backtest muestra que esta ventaja descriptiva no garantiza superioridad predictiva bajo RMSE crudo y horizontes cortos o medianos.
 
+La simulación de la Sección \ref{sec:simulacion} refuerza esta interpretación. Bajo un proceso generador altamente persistente, PM domina de forma natural; bajo baja persistencia, el mismo pipeline favorece modelos dinámicos; y bajo cambios de régimen, los rankings se vuelven más variables. Por ello, la evidencia empírica no debe leerse como una falla mecánica de la FPCA, sino como señal de que, para estas \SVIs{} y esta pérdida, el componente predecible incremental no compensa los costos de suavizado, truncación y estimación.
+
 \section{Limitaciones}
 
 La primera limitación es la longitud de la muestra. Aunque 299 superficies completas representan una base valiosa para mercados latinoamericanos, siguen siendo pocas observaciones para estimar modelos dinámicos flexibles, especialmente variantes kernel o sistemas VAR de dimensión moderada.
@@ -931,6 +1106,8 @@ En la dimensión descriptiva, los resultados son contundentes. Los ocho pares cu
 En la dimensión predictiva, la evidencia rechaza H2. En los ocho pares y tres horizontes evaluados, PM obtiene el menor RMSE mediano. Las alternativas PA, VAR1, ARHinc y KernelARH no superan de manera sistemática el benchmark. En USD/PEN, el resultado es especialmente claro: PM registra RMSE medianos de 0.1200, 0.3227 y 0.4223 para \(h=1,5,10\), mientras que las mejores alternativas no PM registran 0.9670, 0.9998 y 1.0394. Las pruebas DM indican inferioridad estadística de las alternativas en todos los horizontes de USD/PEN.
 
 La evidencia también apoya H3. La persistencia cruda es un benchmark difícil porque las superficies son persistentes y porque PM no incurre en errores de suavizado, truncación o estimación. Las pruebas de robustez muestran que esta conclusión se mantiene bajo MAE, ponderaciones por tenor y bases alternativas, aunque una base más flexible genera excepciones locales en algunos pares y horizontes. El éxito descriptivo de FPCA no garantiza menor pérdida predictiva sobre una malla cruda.
+
+El estudio de simulación complementa esta conclusión. En datos simulados, PM domina cuando la dinámica verdadera es fuertemente persistente, pero deja de hacerlo cuando los puntajes tienen baja persistencia. Esto sugiere que la dominancia empírica de PM no es un artefacto inevitable del pipeline funcional, sino una propiedad del problema evaluado bajo la pérdida considerada.
 
 El aporte final de la tesis es, por tanto, una lectura equilibrada. La metodología funcional proporciona una representación parsimoniosa, interpretable y reproducible de superficies de volatilidad implícita. El ejercicio de pronóstico, diseñado sin filtración temporal y comparado contra una referencia fuerte, muestra que los modelos dinámicos en puntajes FPCA no mejoran la precisión fuera de muestra bajo RMSE en esta muestra. Este resultado negativo es informativo para investigación y práctica: antes de introducir dinámica sofisticada, es indispensable medir su valor incremental frente a persistencia cruda.
 
@@ -963,6 +1140,19 @@ La corrida final se generó con el script \texttt{tesis\_volatilidad\_analysis\_
   \item \texttt{tesis\_outputs/rolling\_fpca\_resumen\_multimoneda.csv}
   \item \texttt{tesis\_outputs/robustez\_perdidas/}
   \item \texttt{tesis\_outputs/robustez\_bases/}
+\end{itemize}
+
+El estudio de simulación se generó con \texttt{tesis\_simulation\_study.R}. El script permite configurar la semilla, el número de replicaciones, el tamaño de muestra, la ventana móvil y \(K_0\) mediante variables de entorno. Sus salidas se guardan en \texttt{tesis\_outputs/simulacion/}. Los archivos principales son:
+
+\begin{itemize}
+  \item \texttt{tesis\_outputs/simulacion/simulation\_run\_config.csv}
+  \item \texttt{tesis\_outputs/simulacion/simulation\_scenario\_parameters.csv}
+  \item \texttt{tesis\_outputs/simulacion/simulation\_loss\_summary.csv}
+  \item \texttt{tesis\_outputs/simulacion/simulation\_model\_rankings.csv}
+  \item \texttt{tesis\_outputs/simulacion/simulation\_chapter\_summary.csv}
+  \item \texttt{tesis\_outputs/simulacion/fig\_simulated\_curves.pdf}
+  \item \texttt{tesis\_outputs/simulacion/fig\_loss\_distributions.pdf}
+  \item \texttt{tesis\_outputs/simulacion/fig\_model\_rankings.pdf}
 \end{itemize}
 
 \begin{thebibliography}{99}
