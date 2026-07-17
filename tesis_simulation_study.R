@@ -531,20 +531,58 @@ p_loss<-rep_loss%>%
 ggsave(file.path(SALIDA_DIR,"fig_loss_distributions.pdf"),
        p_loss,width=10,height=7)
 
-p_rank<-rank_freq%>%
+rank_plot_data<-rank_freq%>%
   filter(loss=="RMSE")%>%
+  dplyr::select(scenario,h,model,win_share)%>%
+  tidyr::complete(
+    scenario=SCENARIOS,
+    h=HORIZONTES,
+    model=c("PM","PA","VAR1","ARHinc","KernelARH"),
+    fill=list(win_share=0)
+  )%>%
+  mutate(
+    scenario=factor(
+      scenario,
+      levels=c("strong_persistence","weak_persistence","regime_change"),
+      labels=c("Alta persistencia","Baja persistencia","Cambio de r\u00e9gimen")
+    ),
+    h=factor(h,levels=HORIZONTES,labels=paste0("h = ",HORIZONTES)),
+    model=factor(model,levels=c("PM","PA","VAR1","ARHinc","KernelARH"))
+  )
+
+p_rank<-rank_plot_data%>%
   ggplot(aes(x=model,y=win_share,fill=model))+
-  geom_col()+
-  facet_grid(scenario~paste0("h=",h))+
-  scale_y_continuous(labels=scales::percent_format())+
-  labs(title="Frecuencia de mejor modelo por escenario (RMSE)",
+  geom_col(width=0.78)+
+  geom_text(
+    aes(label=ifelse(win_share>=0.025,
+                     scales::percent(win_share,accuracy=0.1),"")),
+    vjust=-0.25,size=2.6
+  )+
+  facet_grid(scenario~h)+
+  scale_fill_manual(values=c(
+    PM="#247BA0",PA="#70C1B3",VAR1="#F25F5C",
+    ARHinc="#50514F",KernelARH="#D9A21B"
+  ))+
+  scale_y_continuous(
+    labels=scales::percent_format(accuracy=1),
+    limits=c(0,1.08),
+    breaks=seq(0,1,0.25),
+    expand=expansion(mult=c(0,0))
+  )+
+  labs(title="Frecuencia de victoria por escenario y horizonte",
+       subtitle="Proporci\u00f3n de replicaciones en que cada modelo obtiene el menor RMSE promedio OOS",
        x=NULL,y="Frecuencia de ranking 1")+
   theme_minimal(base_size=11)+
-  theme(legend.position="none",
-        axis.text.x=element_text(angle=30,hjust=1))
+  theme(
+    legend.position="none",
+    panel.grid.minor=element_blank(),
+    axis.text.x=element_text(angle=28,hjust=1),
+    strip.text=element_text(face="bold"),
+    plot.title.position="plot"
+  )
 
 ggsave(file.path(SALIDA_DIR,"fig_model_rankings.pdf"),
-       p_rank,width=10,height=7)
+       p_rank,width=10,height=6.8)
 
 cat("Archivos guardados en:",SALIDA_DIR,"\n")
 print(loss_summary)

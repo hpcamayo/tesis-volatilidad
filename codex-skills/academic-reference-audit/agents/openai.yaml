@@ -1,0 +1,4 @@
+interface:
+  display_name: "Academic Reference Audit"
+  short_description: "Audit scholarly claims, sources, and BibTeX"
+  default_prompt: "Use $academic-reference-audit to audit thesis claims, verify sources, and update the evidence ledger."
